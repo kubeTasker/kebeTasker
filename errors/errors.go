@@ -131,7 +131,6 @@ func unwrapCause(err error) error {
 	return err
 }
 
-
 func (e kubetaskererr) Error() string {
 	return e.message
 }
