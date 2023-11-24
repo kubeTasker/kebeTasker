@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/kubeTasker/kubeTasker/errors"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/util/retry"
@@ -27,7 +28,6 @@ import (
 	"github.com/kubeTasker/kubeTasker/workflow/artifacts/raw"
 	"github.com/kubeTasker/kubeTasker/workflow/artifacts/s3"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
-	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
