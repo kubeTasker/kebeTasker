@@ -18,15 +18,6 @@ const (
 	CodeInternal       = "ERR_INTERNAL"
 )
 
-// ArgoError is an error interface that additionally adds support for
-// stack trace, error code, and a JSON representation of the error
-type ArgoError interface {
-	Error() string
-	Code() string
-	HTTPCode() int
-	JSON() []byte
-}
-
 // kubeTaskerError is an error interface that additionally adds support for
 // stack trace, error code, and a JSON representation of the error
 type kubeTaskerError interface {
