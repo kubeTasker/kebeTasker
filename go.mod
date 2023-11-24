@@ -8,6 +8,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/kubeTasker/pkg v0.0.1
 	github.com/sirupsen/logrus v1.9.3
+	github.com/spf13/cobra v1.2.1
 	github.com/tidwall/gjson v1.17.0
 	github.com/valyala/fasttemplate v1.2.2
 	k8s.io/api v0.28.3

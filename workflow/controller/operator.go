@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/kubeTasker/kubeTasker/errors"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
-	jsonpatch "github.com/evanphx/json-patch"
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -79,7 +79,6 @@ func newWorkflowOperationCtx(wf *wfv1.Workflow, wfc *WorkflowController) *wfOper
 
 	return &woc
 }
-
 
 // operate is the main operator logic of a workflow.
 // It evaluates the current state of the workflow, and its pods
@@ -995,7 +994,6 @@ func (wfs *wfScope) resolveVar(v string) (interface{}, error) {
 	return nil, errors.Errorf(errors.CodeBadRequest, "Unable to resolve input artifact: {{%s}}", v)
 }
 
-
 func (wfs *wfScope) resolveParameter(v string) (string, error) {
 	val, err := wfs.resolveVar(v)
 	if err != nil {
@@ -1062,4 +1060,3 @@ func (woc *wfOperationCtx) executeResource(nodeName string, tmpl *wfv1.Template)
 	woc.log.Infof("Initialized resource node %v", node)
 	return nil
 }
-

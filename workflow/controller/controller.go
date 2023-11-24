@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/kubeTasker/kubeTasker/errors"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	wfclientset "github.com/kubeTasker/kubeTasker/pkg/client/clientset/versioned"
 	wfinformers "github.com/kubeTasker/kubeTasker/pkg/client/informers/externalversions"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
-	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +47,7 @@ type WorkflowController struct {
 	podInformer   cache.SharedIndexInformer
 	wfQueue       workqueue.RateLimitingInterface
 	podQueue      workqueue.RateLimitingInterface
-	completedPods chan string	
+	completedPods chan string
 }
 
 // WorkflowControllerConfig contain the configuration settings for the workflow controller

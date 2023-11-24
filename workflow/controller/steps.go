@@ -15,7 +15,6 @@ import (
 	"github.com/valyala/fasttemplate"
 )
 
-
 func (woc *wfOperationCtx) executeSteps(nodeName string, tmpl *wfv1.Template) error {
 	nodeID := woc.wf.NodeID(nodeName)
 	defer func() {
@@ -173,7 +172,6 @@ func (woc *wfOperationCtx) executeStepGroup(stepGroup []wfv1.WorkflowStep, sgNod
 	woc.log.Infof("Step group node %v successful", woc.wf.Status.Nodes[nodeID])
 	return nil
 }
-
 
 var whenExpression = regexp.MustCompile("^(.*)(==|!=)(.*)$")
 

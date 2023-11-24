@@ -547,4 +547,3 @@ func verifyResolvedVariables(tmplStr string) error {
 	})
 	return unresolvedErr
 }
-

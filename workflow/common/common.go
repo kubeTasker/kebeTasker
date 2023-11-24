@@ -89,7 +89,7 @@ const (
 	EnvVarNamespace = "KUBETASKER_NAMESPACE"
 	// EnvVarTaskerTrace is used enable tracing statements in kubeTasker components
 	EnvVarTaskerTrace = "Tasker_TRACE"
-	
+
 	// These are global variables that are added to the scope during template execution and can be referenced using {{}} syntax
 
 	// GlobalVarWorkflowName is a global workflow variable referencing the workflow's metadata.name field
