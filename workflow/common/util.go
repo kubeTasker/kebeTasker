@@ -255,6 +255,10 @@ func AddPodAnnotation(c kubernetes.Interface, podName, namespace, key, value str
 	return addPodMetadata(c, "annotations", podName, key, value)
 }
 
+func AddPodLabel(c kubernetes.Interface, podName, namespace, key, value string) error {
+	return addPodMetadata(c, "labels", podName, namespace, key, value)
+}
+
 // addPodMetadata is helper to either add a pod label or annotation to the pod
 func addPodMetadata(c kubernetes.Interface, field, podName, namespace, key, value string) error {
 	metadata := map[string]interface{}{
