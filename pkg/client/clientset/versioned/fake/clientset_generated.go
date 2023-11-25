@@ -58,7 +58,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // KubeTaskerV1alpha1 retrieves the KubeTaskerV1alpha1Client
 func (c *Clientset) KubeTaskerV1alpha1() kubetaskerv1alpha1.KubeTaskerV1alpha1Interface {

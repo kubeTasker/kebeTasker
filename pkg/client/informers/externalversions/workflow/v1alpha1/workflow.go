@@ -3,6 +3,7 @@
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	workflowv1alpha1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
@@ -45,13 +46,13 @@ func NewFilteredWorkflowInformer(client versioned.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KubeTaskerV1alpha1().Workflows(namespace).List(options)
+				return client.KubeTaskerV1alpha1().Workflows(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KubeTaskerV1alpha1().Workflows(namespace).Watch(options)
+				return client.KubeTaskerV1alpha1().Workflows(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&workflowv1alpha1.Workflow{},
