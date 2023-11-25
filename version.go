@@ -62,4 +62,3 @@ func GetVersion() Version {
 		Platform:     fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 	}
 }
-
