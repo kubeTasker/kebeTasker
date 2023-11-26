@@ -66,7 +66,7 @@ type WorkflowControllerConfig struct {
 
 	// InstanceID is a label selector to limit the controller's watch to a specific instance. It
 	// contains an arbitrary value that is carried forward into its pod labels, under the key
-	// workflows.kubeTasker.io/controller-instanceid, for the purposes of workflow segregation. This
+	// workflows.kubetasker.io/controller-instanceid, for the purposes of workflow segregation. This
 	// enables a controller to only receive workflow and pod events that it is interested about,
 	// in order to support multiple controllers in a single cluster, and ultimately allows the
 	// controller itself to be bundled as part of a higher level application. If omitted, the
@@ -273,7 +273,7 @@ func (wfc *WorkflowController) ResyncConfig() error {
 		namespace = common.DefaultControllerNamespace
 	}
 	cmClient := wfc.kubeclientset.CoreV1().ConfigMaps(namespace)
-	cm, err := cmClient.Get(wfc.ConfigMap, metav1.GetOptions{})
+	cm, err := cmClient.Get(context.TODO(), wfc.ConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return errors.InternalWrapError(err)
 	}
@@ -407,7 +407,7 @@ func (wfc *WorkflowController) newControllerConfigMapWatch() *cache.ListWatch {
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec)
-		return req.Do().Get()
+		return req.Do(context.TODO()).Get()
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
@@ -416,7 +416,7 @@ func (wfc *WorkflowController) newControllerConfigMapWatch() *cache.ListWatch {
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec)
-		return req.Watch()
+		return req.Watch(context.TODO())
 	}
 	return &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }
@@ -439,7 +439,7 @@ func (wfc *WorkflowController) newWorkflowPodWatch() *cache.ListWatch {
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec)
-		return req.Do().Get()
+		return req.Do(context.TODO()).Get()
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
@@ -449,7 +449,7 @@ func (wfc *WorkflowController) newWorkflowPodWatch() *cache.ListWatch {
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec)
-		return req.Watch()
+		return req.Watch(context.TODO())
 	}
 	return &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }

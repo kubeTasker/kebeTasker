@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -9,6 +10,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/kubeTasker/kubeTasker/errors"
+	workflow "github.com/kubeTasker/kubeTasker/pkg/apis/workflow"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
 	log "github.com/sirupsen/logrus"
@@ -225,7 +227,7 @@ func (woc *wfOperationCtx) persistUpdates() {
 	if string(patchBytes) != "{}" {
 		woc.log.Debugf("Applying patch: %s", patchBytes)
 		wfClient := woc.controller.wfclientset.KubeTaskerV1alpha1().Workflows(woc.wf.ObjectMeta.Namespace)
-		_, err = wfClient.Patch(woc.wf.ObjectMeta.Name, types.MergePatchType, patchBytes)
+		_, err = wfClient.Patch(context.TODO(), woc.wf.ObjectMeta.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			woc.log.Errorf("Error applying patch %s: %v", patchBytes, err)
 			return
@@ -303,7 +305,7 @@ func (woc *wfOperationCtx) processNodeRetries(node *wfv1.NodeStatus) error {
 // Records all pods which were observed completed, which will be labeled completed=true
 // after successful persist of the workflow.
 func (woc *wfOperationCtx) podReconciliation() error {
-	podList, err := woc.getRunningWorkflowPods()
+	podList, err := woc.getAllWorkflowPods()
 	if err != nil {
 		return err
 	}
@@ -389,7 +391,7 @@ func (woc *wfOperationCtx) getAllWorkflowPods() (*apiv1.PodList, error) {
 			common.LabelKeyWorkflow,
 			woc.wf.ObjectMeta.Name),
 	}
-	podList, err := woc.controller.kubeclientset.CoreV1().Pods(woc.wf.Namespace).List(options)
+	podList, err := woc.controller.kubeclientset.CoreV1().Pods(woc.wf.Namespace).List(context.TODO(), options)
 	if err != nil {
 		return nil, errors.InternalWrapError(err)
 	}
@@ -643,9 +645,9 @@ func (woc *wfOperationCtx) createPVCs() error {
 		woc.log.Infof("Creating pvc %s", pvcName)
 		pvcTmpl.ObjectMeta.Name = pvcName
 		pvcTmpl.OwnerReferences = []metav1.OwnerReference{
-			*metav1.NewControllerRef(woc.wf, wfv1.SchemaGroupVersionKind),
+			*metav1.NewControllerRef(woc.wf, wfv1.SchemeGroupVersion.WithKind(workflow.Kind)),
 		}
-		pvc, err := pvcClient.Create(&pvcTmpl)
+		pvc, err := pvcClient.Create(context.TODO(), &pvcTmpl, metav1.CreateOptions{})
 		if err != nil {
 			woc.markNodeError(woc.wf.ObjectMeta.Name, err)
 			return err
@@ -676,7 +678,7 @@ func (woc *wfOperationCtx) deletePVCs() error {
 	var firstErr error
 	for _, pvc := range woc.wf.Status.PersistentVolumeClaims {
 		woc.log.Infof("Deleting PVC %s", pvc.PersistentVolumeClaim.ClaimName)
-		err := pvcClient.Delete(pvc.PersistentVolumeClaim.ClaimName, nil)
+		err := pvcClient.Delete(context.TODO(), pvc.PersistentVolumeClaim.ClaimName, metav1.DeleteOptions{})
 		if err != nil {
 			if !apierr.IsNotFound(err) {
 				woc.log.Errorf("Failed to delete pvc %s: %v", pvc.PersistentVolumeClaim.ClaimName, err)

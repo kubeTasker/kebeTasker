@@ -15,7 +15,7 @@ type KubeTaskerV1alpha1Interface interface {
 	WorkflowsGetter
 }
 
-// KubeTaskerV1alpha1Client is used to interact with features provided by the kubeTasker.io group.
+// KubeTaskerV1alpha1Client is used to interact with features provided by the kubetasker.io group.
 type KubeTaskerV1alpha1Client struct {
 	restClient rest.Interface
 }

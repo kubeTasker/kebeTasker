@@ -2,7 +2,7 @@ package workflow
 
 // Workflow constants
 const (
-	Group     string = "kubeTasker.io"
+	Group     string = "kubetasker.io"
 	Kind      string = "Workflow"
 	Singular  string = "workflow"
 	Plural    string = "workflows"

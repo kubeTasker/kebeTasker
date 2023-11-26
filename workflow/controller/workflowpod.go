@@ -1,12 +1,14 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"path"
 
 	"github.com/kubeTasker/kubeTasker/errors"
+	workflow "github.com/kubeTasker/kubeTasker/pkg/apis/workflow"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
 	log "github.com/sirupsen/logrus"
@@ -119,7 +121,7 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 				common.AnnotationKeyNodeName: nodeName,
 			},
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(woc.wf, wfv1.SchemaGroupVersionKind),
+				*metav1.NewControllerRef(woc.wf, wfv1.SchemeGroupVersion.WithKind(workflow.Kind)),
 			},
 		},
 		Spec: apiv1.PodSpec{
@@ -201,7 +203,7 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 	}
 	pod.ObjectMeta.Annotations[common.AnnotationKeyTemplate] = string(tmplBytes)
 
-	created, err := woc.controller.kubeclientset.CoreV1().Pods(woc.wf.ObjectMeta.Namespace).Create(&pod)
+	created, err := woc.controller.kubeclientset.CoreV1().Pods(woc.wf.ObjectMeta.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 	if err != nil {
 		if apierr.IsAlreadyExists(err) {
 			// workflow pod names are deterministic. We can get here if the

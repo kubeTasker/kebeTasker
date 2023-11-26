@@ -348,7 +348,7 @@ func (we *WorkflowExecutor) getPod() (*apiv1.Pod, error) {
 	var pod *apiv1.Pod
 	var err error
 	_ = wait.ExponentialBackoff(DefaultRetry, func() (bool, error) {
-		pod, err = podsIf.Get(we.PodName, metav1.GetOptions{})
+		pod, err = podsIf.Get(context.TODO(), we.PodName, metav1.GetOptions{})
 		if err != nil {
 			log.Warnf("Failed to get pod '%s': %v", we.PodName, err)
 			if !retry.IsRetryableKubeAPIError(err) {
@@ -374,7 +374,7 @@ func (we *WorkflowExecutor) getSecrets(namespace, name, key string) (string, err
 	var secret *apiv1.Secret
 	var err error
 	_ = wait.ExponentialBackoff(DefaultRetry, func() (bool, error) {
-		secret, err = secretsIf.Get(name, metav1.GetOptions{})
+		secret, err = secretsIf.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			log.Warnf("Failed to get secret '%s': %v", name, err)
 			if !retry.IsRetryableKubeAPIError(err) {

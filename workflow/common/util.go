@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +16,9 @@ import (
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasttemplate"
-	apiv1 "k8s.io/api/core/v1"
+	apiv1 "k8s.io/api/core/v1"git
 	apierr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	apivalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -252,7 +254,7 @@ func RunCommand(name string, arg ...string) error {
 const patchRetries = 5
 
 func AddPodAnnotation(c kubernetes.Interface, podName, namespace, key, value string) error {
-	return addPodMetadata(c, "annotations", podName, key, value)
+	return addPodMetadata(c, "annotations", podName, namespace, key, value)
 }
 
 func AddPodLabel(c kubernetes.Interface, podName, namespace, key, value string) error {
@@ -274,7 +276,7 @@ func addPodMetadata(c kubernetes.Interface, field, podName, namespace, key, valu
 		return errors.InternalWrapError(err)
 	}
 	for attempt := 0; attempt < patchRetries; attempt++ {
-		_, err = c.CoreV1().Pods(namespace).Patch(podName, types.MergePatchType, patch)
+		_, err = c.CoreV1().Pods(namespace).Patch(context.TODO(), podName, types.MergePatchType, patch, metav1.PatchOptions{})
 		if err != nil {
 			if !apierr.IsConflict(err) {
 				return err
