@@ -38,7 +38,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	switch resource {
 	// Group=kubetasker.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("workflows"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.KubeTasker().V1alpha1().Workflows().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubetasker().V1alpha1().Workflows().Informer()}, nil
 
 	}
 

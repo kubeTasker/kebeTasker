@@ -267,9 +267,6 @@ type WorkflowStep struct {
 	When string `json:"when,omitempty"`
 }
 
-// Item expands a single workflow step into multiple parallel steps
-type Item interface{}
-
 // Arguments to a template
 type Arguments struct {
 	// Parameters is the list of parameters to pass to the template or workflow

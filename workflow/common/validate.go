@@ -303,12 +303,17 @@ func addItemsToScope(step *wfv1.WorkflowStep, scope map[string]interface{}) erro
 		return fmt.Errorf("only one of withItems or withParam can be specified")
 	}
 	if len(step.WithItems) > 0 {
-		switch val := step.WithItems[0].(type) {
-		case string, int32, int64, float32, float64:
-			scope["item"] = true
-		case map[string]interface{}:
-			for itemKey := range val {
-				scope[fmt.Sprintf("item.%s", itemKey)] = true
+		for i := range step.WithItems {
+			val := step.WithItems[i]
+			switch val.Type {
+			case wfv1.String, wfv1.Number, wfv1.Bool:
+				scope["item"] = true
+			case wfv1.Map:
+				for itemKey := range val.MapVal {
+					scope[fmt.Sprintf("item.%s", itemKey)] = true
+				}
+			default:
+				return fmt.Errorf("unsupported withItems type: %v", val)
 			}
 		}
 	} else if step.WithParam != "" {

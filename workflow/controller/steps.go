@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -291,44 +290,13 @@ func (woc *wfOperationCtx) expandStep(step wfv1.WorkflowStep) ([]wfv1.WorkflowSt
 	}
 
 	for i, item := range items {
-		replaceMap := make(map[string]string)
-		var newStepName string
-		switch val := item.(type) {
-		case string, int32, int64, float32, float64:
-			replaceMap["item"] = fmt.Sprintf("%v", val)
-			newStepName = fmt.Sprintf("%s(%v)", step.Name, val)
-		case map[string]interface{}:
-			// Handle the case when withItems is a list of maps.
-			// vals holds stringified versions of the map items which are incorporated as part of the step name.
-			// For example if the item is: {"name": "jesse","group":"developer"}
-			// the vals would be: ["name:jesse", "group:developer"]
-			// This would eventually be part of the step name (group:developer,name:jesse)
-			vals := make([]string, 0)
-			for itemKey, itemValIf := range val {
-				switch itemVal := itemValIf.(type) {
-				case string, int32, int64, float32, float64:
-					replaceMap[fmt.Sprintf("item.%s", itemKey)] = fmt.Sprintf("%v", itemVal)
-					vals = append(vals, fmt.Sprintf("%s:%s", itemKey, itemVal))
-				default:
-					return nil, errors.Errorf(errors.CodeBadRequest, "withItems[%d][%s] expected string or number. received: %s", i, itemKey, itemVal)
-				}
-			}
-			// sort the values so that the name is deterministic
-			sort.Strings(vals)
-			newStepName = fmt.Sprintf("%s(%v)", step.Name, strings.Join(vals, ","))
-		default:
-			return nil, errors.Errorf(errors.CodeBadRequest, "withItems[%d] expected string, number, or map. received: %s", i, val)
-		}
-		newStepStr, err := common.Replace(fstTmpl, replaceMap, false, "")
+		var newStep wfv1.WorkflowStep
+		newStepName, err := processItem(fstTmpl, step.Name, i, item, &newStep)
 		if err != nil {
 			return nil, err
 		}
-		var newStep wfv1.WorkflowStep
-		err = json.Unmarshal([]byte(newStepStr), &newStep)
-		if err != nil {
-			return nil, errors.InternalWrapError(err)
-		}
 		newStep.Name = newStepName
+		newStep.Template = step.Template
 		expandedStep = append(expandedStep, newStep)
 	}
 	return expandedStep, nil

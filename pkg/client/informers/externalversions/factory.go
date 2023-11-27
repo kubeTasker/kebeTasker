@@ -227,9 +227,9 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
-	KubeTasker() workflow.Interface
+	Kubetasker() workflow.Interface
 }
 
-func (f *sharedInformerFactory) KubeTasker() workflow.Interface {
+func (f *sharedInformerFactory) Kubetasker() workflow.Interface {
 	return workflow.New(f, f.namespace, f.tweakListOptions)
 }

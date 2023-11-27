@@ -335,7 +335,7 @@ func (wfc *WorkflowController) newWorkflowInformer() cache.SharedIndexInformer {
 		wfc.Config.Namespace,
 		wfc.tweakWorkflowlist,
 	)
-	informer := wfInformerFactory.KubeTasker().V1alpha1().Workflows().Informer()
+	informer := wfInformerFactory.Kubetasker().V1alpha1().Workflows().Informer()
 	informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {

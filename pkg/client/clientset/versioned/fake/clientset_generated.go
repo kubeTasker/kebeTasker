@@ -63,7 +63,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// KubeTaskerV1alpha1 retrieves the KubeTaskerV1alpha1Client
-func (c *Clientset) KubeTaskerV1alpha1() kubetaskerv1alpha1.KubeTaskerV1alpha1Interface {
-	return &fakekubetaskerv1alpha1.FakeKubeTaskerV1alpha1{Fake: &c.Fake}
+// KubetaskerV1alpha1 retrieves the KubetaskerV1alpha1Client
+func (c *Clientset) KubetaskerV1alpha1() kubetaskerv1alpha1.KubetaskerV1alpha1Interface {
+	return &fakekubetaskerv1alpha1.FakeKubetaskerV1alpha1{Fake: &c.Fake}
 }

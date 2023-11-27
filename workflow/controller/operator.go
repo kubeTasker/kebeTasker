@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	workflow "github.com/kubeTasker/kubeTasker/pkg/apis/workflow"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
+	"github.com/valyala/fasttemplate"
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -226,7 +228,7 @@ func (woc *wfOperationCtx) persistUpdates() {
 	}
 	if string(patchBytes) != "{}" {
 		woc.log.Debugf("Applying patch: %s", patchBytes)
-		wfClient := woc.controller.wfclientset.KubeTaskerV1alpha1().Workflows(woc.wf.ObjectMeta.Namespace)
+		wfClient := woc.controller.wfclientset.KubetaskerV1alpha1().Workflows(woc.wf.ObjectMeta.Namespace)
 		_, err = wfClient.Patch(context.TODO(), woc.wf.ObjectMeta.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			woc.log.Errorf("Error applying patch %s: %v", patchBytes, err)
@@ -1061,4 +1063,54 @@ func (woc *wfOperationCtx) executeResource(nodeName string, tmpl *wfv1.Template)
 	node := woc.markNodePhase(nodeName, wfv1.NodeRunning)
 	woc.log.Infof("Initialized resource node %v", node)
 	return nil
+}
+
+func processItem(fstTmpl *fasttemplate.Template, name string, index int, item wfv1.Item, obj interface{}) (string, error) {
+	replaceMap := make(map[string]string)
+	var newName string
+
+	switch item.Type {
+	case wfv1.String, wfv1.Number, wfv1.Bool:
+		replaceMap["item"] = fmt.Sprintf("%v", item)
+		newName = fmt.Sprintf("%s(%d:%v)", name, index, item)
+	case wfv1.Map:
+		// Handle the case when withItems is a list of maps.
+		// vals holds stringified versions of the map items which are incorporated as part of the step name.
+		// For example if the item is: {"name": "jesse","group":"developer"}
+		// the vals would be: ["name:jesse", "group:developer"]
+		// This would eventually be part of the step name (group:developer,name:jesse)
+		vals := make([]string, 0)
+		for itemKey, itemVal := range item.MapVal {
+			replaceMap[fmt.Sprintf("item.%s", itemKey)] = fmt.Sprintf("%v", itemVal)
+			vals = append(vals, fmt.Sprintf("%s:%s", itemKey, itemVal))
+
+		}
+		jsonByteVal, err := json.Marshal(item.MapVal)
+		if err != nil {
+			return "", errors.InternalWrapError(err)
+		}
+		replaceMap["item"] = string(jsonByteVal)
+
+		// sort the values so that the name is deterministic
+		sort.Strings(vals)
+		newName = fmt.Sprintf("%s(%d:%v)", name, index, strings.Join(vals, ","))
+	case wfv1.List:
+		byteVal, err := json.Marshal(item.ListVal)
+		if err != nil {
+			return "", errors.InternalWrapError(err)
+		}
+		replaceMap["item"] = string(byteVal)
+		newName = fmt.Sprintf("%s(%d:%v)", name, index, item.ListVal)
+	default:
+		return "", errors.Errorf(errors.CodeBadRequest, "withItems[%d] expected string, number, list, or map. received: %v", index, item)
+	}
+	newStepStr, err := common.Replace(fstTmpl, replaceMap, false, "")
+	if err != nil {
+		return "", err
+	}
+	err = json.Unmarshal([]byte(newStepStr), &obj)
+	if err != nil {
+		return "", errors.InternalWrapError(err)
+	}
+	return newName, nil
 }

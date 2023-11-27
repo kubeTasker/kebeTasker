@@ -15,7 +15,7 @@ import (
 
 // FakeWorkflows implements WorkflowInterface
 type FakeWorkflows struct {
-	Fake *FakeKubeTaskerV1alpha1
+	Fake *FakeKubetaskerV1alpha1
 	ns   string
 }
 

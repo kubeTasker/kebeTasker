@@ -14,18 +14,18 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	KubeTaskerV1alpha1() kubetaskerv1alpha1.KubeTaskerV1alpha1Interface
+	KubetaskerV1alpha1() kubetaskerv1alpha1.KubetaskerV1alpha1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	kubeTaskerV1alpha1 *kubetaskerv1alpha1.KubeTaskerV1alpha1Client
+	kubetaskerV1alpha1 *kubetaskerv1alpha1.KubetaskerV1alpha1Client
 }
 
-// KubeTaskerV1alpha1 retrieves the KubeTaskerV1alpha1Client
-func (c *Clientset) KubeTaskerV1alpha1() kubetaskerv1alpha1.KubeTaskerV1alpha1Interface {
-	return c.kubeTaskerV1alpha1
+// KubetaskerV1alpha1 retrieves the KubetaskerV1alpha1Client
+func (c *Clientset) KubetaskerV1alpha1() kubetaskerv1alpha1.KubetaskerV1alpha1Interface {
+	return c.kubetaskerV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -72,7 +72,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.kubeTaskerV1alpha1, err = kubetaskerv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.kubetaskerV1alpha1, err = kubetaskerv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.kubeTaskerV1alpha1 = kubetaskerv1alpha1.New(c)
+	cs.kubetaskerV1alpha1 = kubetaskerv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
