@@ -1,6 +1,6 @@
 module github.com/kubeTasker/kubeTasker
 
-go 1.16
+go 1.18
 
 require (
 	github.com/dustin/go-humanize v1.0.1
@@ -8,8 +8,6 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/hashicorp/go-version v1.6.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/kubeTasker/pkg v0.0.1
