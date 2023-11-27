@@ -1,3 +1,5 @@
 .vscode/
 vendor/
 dist/
+k8s.io/
+github.com/

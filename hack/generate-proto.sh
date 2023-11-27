@@ -2,10 +2,10 @@
 set -eux -o pipefail
 
 go get k8s.io/code-generator/cmd/go-to-protobuf
-go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway@v1.16.0
 go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
-go get github.com/gogo/protobuf/protoc-gen-gogofast
-go get github.com/gogo/protobuf/gogoproto
+go get github.com/gogo/protobuf/protoc-gen-gogofast@v1.3.2
+go get github.com/gogo/protobuf/gogoproto@v1.3.2
 
 go install k8s.io/code-generator/cmd/go-to-protobuf
 
@@ -19,8 +19,8 @@ for f in $(find pkg -name '*.proto'); do
         -I /usr/local/include \
         -I . \
         -I ${GOPATH}/src \
-        -I ${GOPATH}/pkg/mod/github.com/gogo/protobuf/gogoproto \
-        -I ${GOPATH}/pkg/mod/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
+        -I ${GOPATH}/pkg/mod/github.com/gogo/protobuf@v1.3.2/gogoproto \
+        -I ${GOPATH}/pkg/mod/github.com/grpc-ecosystem/grpc-gateway@v1.16.0/third_party/googleapis \
         --gogofast_out=plugins=grpc:${GOPATH}/src \
         --grpc-gateway_out=logtostderr=true:${GOPATH}/src \
         --swagger_out=logtostderr=true,fqn_for_swagger_name=true:. \
