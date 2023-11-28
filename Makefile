@@ -1,7 +1,7 @@
 PACKAGE=github.com/kubeTasker/kubeTasker
 CURRENT_DIR=$(shell pwd)
 DIST_DIR=${CURRENT_DIR}/dist
-IMAGE_NAMESPACE=kubetasker
+IMAGE_NAMESPACE=songjunfan
 
 VERSION=$(shell cat ${CURRENT_DIR}/VERSION)
 BUILD_DATE=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -61,9 +61,25 @@ controller:
 controller-debug:
 	go build -v -ldflags '${LDFLAGS}' -gcflags="all=-N -l" -o ${DIST_DIR}/workflow-controller ./cmd/workflow-controller
 
+controller-linux: builder
+	${BUILDER_CMD} make controller
+
 controller-image: controller-linux
 	docker build -t $(IMAGE_PREFIX)workflow-controller:$(IMAGE_TAG) -f Dockerfile-workflow-controller .
 	@if [ "$(DOCKER_PUSH)" = "true" ] ; then docker push $(IMAGE_PREFIX)workflow-controller:$(IMAGE_TAG) ; fi
+
+executor:
+	go build -v -ldflags '${LDFLAGS}' -o ${DIST_DIR}/taskerexec ./cmd/taskerexec
+
+executor-debug:
+	go build -v -ldflags '${LDFLAGS}' -gcflags="all=-N -l" -o ${DIST_DIR}/taskerexec ./cmd/taskerexec
+
+executor-linux: builder
+	${BUILDER_CMD} make executor
+
+executor-image: executor-linux
+	docker build -t $(IMAGE_PREFIX)taskerexec:$(IMAGE_TAG) -f Dockerfile-taskerexec .
+	@if [ "$(DOCKER_PUSH)" = "true" ] ; then docker push $(IMAGE_PREFIX)taskerexec:$(IMAGE_TAG) ; fi
 
 test:
 	go test ./...
