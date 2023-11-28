@@ -289,7 +289,7 @@ func addPodMetadata(c kubernetes.Interface, field, podName, namespace, key, valu
 	return err
 }
 
-const workflowFieldNameFmt string = "[a-zA-Z0-9][-a-zA-Z0-9]"
+const workflowFieldNameFmt string = "[a-zA-Z0-9][-a-zA-Z0-9]*"
 const workflowFieldNameErrMsg string = "name must consist of alpha-numeric characters or '-', and must start with an alpha-numeric character"
 const workflowFieldMaxLength int = 128
 
