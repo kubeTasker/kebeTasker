@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -576,7 +577,25 @@ func installCRD(clientset *kubernetes.Clientset, args InstallFlags) {
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 							Type:       "object",
 							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								// Define your CRD properties here
+								"apiVersion": {
+									Type: "string",
+								},
+								"kind": {
+									Type: "string",
+								},
+								"metadata": {
+									Type: "object",
+								},
+								"spec": {
+									Type:                   "object",
+									XMapType:               pointer.String("atomic"),
+									XPreserveUnknownFields: pointer.Bool(true),
+								},
+								"status": {
+									Type: "object",
+									XMapType: pointer.String("atomic"),
+									XPreserveUnknownFields: pointer.Bool(true),
+								},
 							},
 						},
 					},
