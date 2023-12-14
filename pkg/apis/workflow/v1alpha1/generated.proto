@@ -305,7 +305,7 @@ message Script {
 message Sidecar {
   optional k8s.io.api.core.v1.Container container = 1 [(gogoproto.customname) = "Container", (gogoproto.nullable) = false];
 
-  optional SidecarOptions sidecarOptions = 2 [(gogoproto.customname) = "SidecarOptions", (gogoproto.nullable) = false];
+  optional SidecarOptions sizecarOptions = 2 [(gogoproto.customname) = "SidecarOptions", (gogoproto.nullable) = false];
 }
 
 // SidecarOptions provide a way to customize the behavior of a sidecar and how it
@@ -360,7 +360,7 @@ message Template {
   // Can be overridden by individual items in Outputs. If omitted, will use the default
   // artifact repository location configured in the controller, appended with the
   // <workflowname>/<nodename> in the key.
-  optional ArtifactLocation archiveLocation = 12 [(gogoproto.customname) = "ArchiveLocation"];
+  optional ArtifactLocation archieveLocation = 12 [(gogoproto.customname) = "ArchiveLocation"];
 
   // Optional duration in seconds relative to the StartTime that the pod may be active on a node
   // before the system actively tries to terminate the pod; value must be positive integer
