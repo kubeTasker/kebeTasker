@@ -81,5 +81,34 @@ executor-image: executor-linux
 	docker build -t $(IMAGE_PREFIX)taskerexec:$(IMAGE_TAG) -f Dockerfile-taskerexec .
 	@if [ "$(DOCKER_PUSH)" = "true" ] ; then docker push $(IMAGE_PREFIX)taskerexec:$(IMAGE_TAG) ; fi
 
+# protoc,my.proto
+define protoc
+	# protoc $(1)
+    [ -e ./vendor ] || go mod vendor
+    protoc \
+      -I /usr/local/include \
+      -I $(CURDIR) \
+      -I $(CURDIR)/vendor \
+      -I $(GOPATH)/src \
+      -I $(GOPATH)/pkg/mod/github.com/gogo/protobuf@v1.3.2/gogoproto \
+      -I $(GOPATH)/pkg/mod/github.com/grpc-ecosystem/grpc-gateway@v1.16.0/third_party/googleapis \
+      --gogofast_out=plugins=grpc:$(GOPATH)/src \
+      --grpc-gateway_out=logtostderr=true:$(GOPATH)/src \
+      --swagger_out=logtostderr=true,fqn_for_swagger_name=true:. \
+      $(1)
+
+endef
+
+pkg/apis/workflow/v1alpha1/generated.proto:
+	# Format proto files. Formatting changes generated code, so we do it here, rather that at lint time.
+	# Why clang-format? Google uses it.
+	find pkg/apiclient -name '*.proto'|xargs clang-format -i
+	$(GOPATH)/bin/go-to-protobuf \
+		--go-header-file=./hack/custom-boilerplate.go.txt \
+		--packages=github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1 \
+		--apimachinery-packages=+k8s.io/apimachinery/pkg/util/intstr,+k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/runtime/schema,+k8s.io/apimachinery/pkg/runtime,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/api/core/v1,k8s.io/api/policy/v1 \
+		--proto-import $(GOPATH)/src
+	touch pkg/apis/workflow/v1alpha1/generated.proto
+
 test:
 	go test ./...

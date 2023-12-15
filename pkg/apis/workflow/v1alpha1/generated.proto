@@ -21,7 +21,7 @@ option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
 option (gogoproto.goproto_getters_all) = false;
-option go_package = "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1";
+option go_package = "v1alpha1";
 
 // Arguments to a template
 message Arguments {
