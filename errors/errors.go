@@ -18,12 +18,12 @@ const (
 	CodeInternal       = "ERR_INTERNAL"
 )
 
-type kubeTaskerError interface {
-	Error() string
-	Code() string
-	HTTPCode() int
-	JSON() []byte
-}
+// type kubeTaskerError interface {
+// 	Error() string
+// 	Code() string
+// 	HTTPCode() int
+// 	JSON() []byte
+// }
 
 type kubetaskererr struct {
 	code    string
