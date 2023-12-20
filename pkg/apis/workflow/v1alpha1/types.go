@@ -202,9 +202,7 @@ type Sidecar struct {
 // SidecarOptions provide a way to customize the behavior of a sidecar and how it
 // affects the main container.
 type SidecarOptions struct {
-
 	MirrorVolumeMounts *bool `json:"mirrorVolumeMounts,omitempty" protobuf:"bytes,1,opt,name=mirrorVolumeMounts"`
-
 }
 
 // WorkflowStatus contains overall status information about a workflow

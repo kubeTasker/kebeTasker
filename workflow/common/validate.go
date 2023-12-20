@@ -14,9 +14,9 @@ import (
 
 // wfValidationCtx is the context for validating a workflow spec
 type wfValidationCtx struct {
-	wf *wfv1.Workflow
+	wf           *wfv1.Workflow
 	globalParams map[string]string
-	results map[string]bool
+	results      map[string]bool
 }
 
 const (
@@ -360,7 +360,7 @@ func validateOutputs(scope map[string]interface{}, tmpl *wfv1.Template) error {
 	return nil
 }
 
-// validateWorkflowFieldNames accepts a slice of structs 
+// validateWorkflowFieldNames accepts a slice of structs
 func validateWorkflowFieldNames(slice interface{}) error {
 	s := reflect.ValueOf(slice)
 	if s.Kind() != reflect.Slice {

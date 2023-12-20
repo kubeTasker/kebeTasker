@@ -8,7 +8,7 @@ import (
 
 const (
 	DefaultControllerDeploymentName = "workflow-controller"
-	DefaultControllerNamespace = "kube-system"
+	DefaultControllerNamespace      = "kube-system"
 
 	WorkflowControllerConfigMapKey = "config"
 
@@ -19,41 +19,39 @@ const (
 	PodMetadataVolumeName = "podmetadata"
 
 	PodMetadataAnnotationsVolumePath = "annotations"
-	PodMetadataMountPath = "/kubetasker/" + PodMetadataVolumeName
-	PodMetadataAnnotationsPath = PodMetadataMountPath + "/" + PodMetadataAnnotationsVolumePath
+	PodMetadataMountPath             = "/kubetasker/" + PodMetadataVolumeName
+	PodMetadataAnnotationsPath       = PodMetadataMountPath + "/" + PodMetadataAnnotationsVolumePath
 
-	DockerLibVolumeName = "docker-lib"
-	DockerLibHostPath = "/var/lib/docker"
+	DockerLibVolumeName  = "docker-lib"
+	DockerLibHostPath    = "/var/lib/docker"
 	DockerSockVolumeName = "docker-sock"
 
-	AnnotationKeyNodeName = workflow.FullName + "/node-name"
-	AnnotationKeyNodeMessage = workflow.FullName + "/node-message"
-	AnnotationKeyTemplate = workflow.FullName + "/template"
-	AnnotationKeyOutputs = workflow.FullName + "/outputs"
+	AnnotationKeyNodeName         = workflow.FullName + "/node-name"
+	AnnotationKeyNodeMessage      = workflow.FullName + "/node-message"
+	AnnotationKeyTemplate         = workflow.FullName + "/template"
+	AnnotationKeyOutputs          = workflow.FullName + "/outputs"
 	AnnotationKeyExecutionControl = workflow.FullName + "/execution"
 
 	LabelKeyControllerInstanceID = workflow.FullName + "/controller-instanceid"
-	LabelKeyCompleted = workflow.FullName + "/completed"
-	LabelKeyWorkflow = workflow.FullName + "/workflow"
-	LabelKeyPhase = workflow.FullName + "/phase"
+	LabelKeyCompleted            = workflow.FullName + "/completed"
+	LabelKeyWorkflow             = workflow.FullName + "/workflow"
+	LabelKeyPhase                = workflow.FullName + "/phase"
 
 	ExecutorArtifactBaseDir = "/kubetasker/inputs/artifacts"
 
 	InitContainerMainFilesystemDir = "/mainctrfs"
 
-	ExecutorStagingEmptyDir = "/kubetasker/staging"
-	ExecutorScriptSourcePath = "/kubetasker/staging/script"
+	ExecutorStagingEmptyDir      = "/kubetasker/staging"
+	ExecutorScriptSourcePath     = "/kubetasker/staging/script"
 	ExecutorResourceManifestPath = "/tmp/manifest.yaml"
 
-
-	EnvVarPodIP = "KUBETASKER_POD_IP"
-	EnvVarPodName = "KUBETASKER_POD_NAME"
-	EnvVarNamespace = "KUBETASKER_NAMESPACE"
+	EnvVarPodIP       = "KUBETASKER_POD_IP"
+	EnvVarPodName     = "KUBETASKER_POD_NAME"
+	EnvVarNamespace   = "KUBETASKER_NAMESPACE"
 	EnvVarTaskerTrace = "Tasker_TRACE"
 
-
-	GlobalVarWorkflowName = "workflow.name"
-	GlobalVarWorkflowUID = "workflow.uid"
+	GlobalVarWorkflowName   = "workflow.name"
+	GlobalVarWorkflowUID    = "workflow.uid"
 	GlobalVarWorkflowStatus = "workflow.status"
 )
 

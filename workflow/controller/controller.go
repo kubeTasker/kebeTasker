@@ -29,7 +29,7 @@ import (
 )
 
 type WorkflowController struct {
-	ConfigMap string
+	ConfigMap   string
 	ConfigMapNS string
 	Config      WorkflowControllerConfig
 
@@ -66,7 +66,7 @@ const (
 
 // ArtifactRepository represents a artifact repository in which a controller will store its artifacts
 type ArtifactRepository struct {
-	S3 *S3ArtifactRepository `json:"s3,omitempty"`
+	S3          *S3ArtifactRepository          `json:"s3,omitempty"`
 	Artifactory *ArtifactoryArtifactRepository `json:"artifactory,omitempty"`
 }
 
@@ -78,7 +78,7 @@ type S3ArtifactRepository struct {
 
 type ArtifactoryArtifactRepository struct {
 	wfv1.ArtifactoryAuth `json:",inline"`
-	RepoURL string `json:"repoURL,omitempty"`
+	RepoURL              string `json:"repoURL,omitempty"`
 }
 
 // NewWorkflowController instantiates a new WorkflowController

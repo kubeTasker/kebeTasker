@@ -46,7 +46,7 @@ type WorkflowExecutor struct {
 
 	mainContainerID string
 	memoizedSecrets map[string]string
-	errors []error
+	errors          []error
 }
 
 // NewExecutor instantiates a new workflow executor

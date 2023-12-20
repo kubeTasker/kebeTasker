@@ -25,14 +25,14 @@ import (
 
 // wfOperationCtx is the context for evaluation and operation of a single workflow
 type wfOperationCtx struct {
-	wf *wfv1.Workflow
-	orig *wfv1.Workflow
-	updated bool
-	log *log.Entry
-	controller *WorkflowController
-	globalParams map[string]string
+	wf            *wfv1.Workflow
+	orig          *wfv1.Workflow
+	updated       bool
+	log           *log.Entry
+	controller    *WorkflowController
+	globalParams  map[string]string
 	completedPods map[string]bool
-	deadline time.Time
+	deadline      time.Time
 }
 
 const maxOperationTime time.Duration = 10 * time.Second
