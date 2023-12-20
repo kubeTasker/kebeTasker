@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,8 +14,8 @@ import (
 	workflow "github.com/kubeTasker/kubeTasker/pkg/apis/workflow"
 	wfv1 "github.com/kubeTasker/kubeTasker/pkg/apis/workflow/v1alpha1"
 	"github.com/kubeTasker/kubeTasker/workflow/common"
-	"github.com/valyala/fasttemplate"
 	log "github.com/sirupsen/logrus"
+	"github.com/valyala/fasttemplate"
 	apiv1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -543,7 +543,7 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 		if ctr.State.Terminated.ExitCode == 0 {
 			continue
 		}
-		errMsg := fmt.Sprintf("failed to load artifacts")
+		errMsg := "failed to load artifacts"
 		for _, msg := range []string{annotatedMsg, ctr.State.Terminated.Message} {
 			if msg != "" {
 				errMsg += ": " + msg
@@ -618,7 +618,7 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 	for _, failMsg := range failMessages {
 		return wfv1.NodeFailed, failMsg
 	}
-	return wfv1.NodeFailed, fmt.Sprintf("pod failed for unknown reason")
+	return wfv1.NodeFailed, "pod failed for unknown reason"
 }
 
 func (woc *wfOperationCtx) createPVCs() error {

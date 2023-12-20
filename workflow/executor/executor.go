@@ -228,7 +228,7 @@ func (we *WorkflowExecutor) SaveArtifacts() error {
 		// we just want reduce peak space usage
 		err = os.Remove(tempArtPath)
 		if err != nil {
-			log.Warn("Failed to remove %s", tempArtPath)
+			log.Warnf("Failed to remove %s", tempArtPath)
 		}
 		we.Template.Outputs.Artifacts[i] = art
 		log.Infof("Successfully saved file: %s", tempArtPath)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -24,7 +23,6 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
@@ -385,65 +383,65 @@ func installController(clientset *kubernetes.Clientset, args InstallFlags) {
 	createDeploymentHelper(&controllerDeployment, args)
 }
 
-func installUI(clientset *kubernetes.Clientset, args InstallFlags) {
-	uiDeployment := appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1beta2",
-			Kind:       "Deployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      args.UIName,
-			Namespace: args.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": args.UIName,
-				},
-			},
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": args.UIName,
-					},
-				},
-				Spec: apiv1.PodSpec{
-					ServiceAccountName: args.UIServiceAccount,
-					Containers: []apiv1.Container{
-						{
-							Name:  args.UIName,
-							Image: args.UIImage,
-							Env: []apiv1.EnvVar{
-								{
-									Name: common.EnvVarNamespace,
-									ValueFrom: &apiv1.EnvVarSource{
-										FieldRef: &apiv1.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.namespace",
-										},
-									},
-								},
-								{
-									Name:  "IN_CLUSTER",
-									Value: "true",
-								},
-								{
-									Name:  "ENABLE_WEB_CONSOLE",
-									Value: strconv.FormatBool(args.EnableWebConsole),
-								},
-								{
-									Name:  "BASE_HREF",
-									Value: args.UIBaseHref,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	createDeploymentHelper(&uiDeployment, args)
-}
+// func installUI(clientset *kubernetes.Clientset, args InstallFlags) {
+// 	uiDeployment := appsv1.Deployment{
+// 		TypeMeta: metav1.TypeMeta{
+// 			APIVersion: "apps/v1beta2",
+// 			Kind:       "Deployment",
+// 		},
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name:      args.UIName,
+// 			Namespace: args.Namespace,
+// 		},
+// 		Spec: appsv1.DeploymentSpec{
+// 			Selector: &metav1.LabelSelector{
+// 				MatchLabels: map[string]string{
+// 					"app": args.UIName,
+// 				},
+// 			},
+// 			Template: apiv1.PodTemplateSpec{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Labels: map[string]string{
+// 						"app": args.UIName,
+// 					},
+// 				},
+// 				Spec: apiv1.PodSpec{
+// 					ServiceAccountName: args.UIServiceAccount,
+// 					Containers: []apiv1.Container{
+// 						{
+// 							Name:  args.UIName,
+// 							Image: args.UIImage,
+// 							Env: []apiv1.EnvVar{
+// 								{
+// 									Name: common.EnvVarNamespace,
+// 									ValueFrom: &apiv1.EnvVarSource{
+// 										FieldRef: &apiv1.ObjectFieldSelector{
+// 											APIVersion: "v1",
+// 											FieldPath:  "metadata.namespace",
+// 										},
+// 									},
+// 								},
+// 								{
+// 									Name:  "IN_CLUSTER",
+// 									Value: "true",
+// 								},
+// 								{
+// 									Name:  "ENABLE_WEB_CONSOLE",
+// 									Value: strconv.FormatBool(args.EnableWebConsole),
+// 								},
+// 								{
+// 									Name:  "BASE_HREF",
+// 									Value: args.UIBaseHref,
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 		},
+// 	}
+// 	createDeploymentHelper(&uiDeployment, args)
+// }
 
 // createDeploymentHelper is helper to create or update an existing deployment (if --upgrade was supplied)
 func createDeploymentHelper(deployment *appsv1.Deployment, args InstallFlags) {
@@ -511,44 +509,44 @@ func upgradeNeeded(dep1, dep2 *appsv1.Deployment) bool {
 	return false
 }
 
-func installUIService(clientset *kubernetes.Clientset, args InstallFlags) {
-	svcName := KubeUIServiceName
-	svcClient := clientset.CoreV1().Services(args.Namespace)
-	uiSvc := apiv1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svcName,
-			Namespace: args.Namespace,
-		},
-		Spec: apiv1.ServiceSpec{
-			Ports: []apiv1.ServicePort{
-				{
-					Port:       80,
-					TargetPort: intstr.FromInt(8001),
-				},
-			},
-			Selector: map[string]string{
-				"app": args.UIName,
-			},
-		},
-	}
-	if args.DryRun {
-		printYAML(uiSvc)
-		return
-	}
-	_, err := svcClient.Create(context.TODO(), &uiSvc, metav1.CreateOptions{})
-	if err != nil {
-		if !apierr.IsAlreadyExists(err) {
-			log.Fatal(err)
-		}
-		fmt.Printf("Service '%s' already exists\n", svcName)
-	} else {
-		fmt.Printf("Service '%s' created\n", svcName)
-	}
-}
+// func installUIService(clientset *kubernetes.Clientset, args InstallFlags) {
+// 	svcName := KubeUIServiceName
+// 	svcClient := clientset.CoreV1().Services(args.Namespace)
+// 	uiSvc := apiv1.Service{
+// 		TypeMeta: metav1.TypeMeta{
+// 			APIVersion: "v1",
+// 			Kind:       "Service",
+// 		},
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name:      svcName,
+// 			Namespace: args.Namespace,
+// 		},
+// 		Spec: apiv1.ServiceSpec{
+// 			Ports: []apiv1.ServicePort{
+// 				{
+// 					Port:       80,
+// 					TargetPort: intstr.FromInt(8001),
+// 				},
+// 			},
+// 			Selector: map[string]string{
+// 				"app": args.UIName,
+// 			},
+// 		},
+// 	}
+// 	if args.DryRun {
+// 		printYAML(uiSvc)
+// 		return
+// 	}
+// 	_, err := svcClient.Create(context.TODO(), &uiSvc, metav1.CreateOptions{})
+// 	if err != nil {
+// 		if !apierr.IsAlreadyExists(err) {
+// 			log.Fatal(err)
+// 		}
+// 		fmt.Printf("Service '%s' already exists\n", svcName)
+// 	} else {
+// 		fmt.Printf("Service '%s' created\n", svcName)
+// 	}
+// }
 
 func installCRD(clientset *kubernetes.Clientset, args InstallFlags) {
 	workflowCRD := apiextensionsv1.CustomResourceDefinition{
@@ -575,7 +573,7 @@ func installCRD(clientset *kubernetes.Clientset, args InstallFlags) {
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							Type:       "object",
+							Type: "object",
 							Properties: map[string]apiextensionsv1.JSONSchemaProps{
 								"apiVersion": {
 									Type: "string",
@@ -592,8 +590,8 @@ func installCRD(clientset *kubernetes.Clientset, args InstallFlags) {
 									XPreserveUnknownFields: pointer.Bool(true),
 								},
 								"status": {
-									Type: "object",
-									XMapType: pointer.String("atomic"),
+									Type:                   "object",
+									XMapType:               pointer.String("atomic"),
 									XPreserveUnknownFields: pointer.Bool(true),
 								},
 							},

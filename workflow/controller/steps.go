@@ -261,9 +261,8 @@ func (woc *wfOperationCtx) expandStepGroup(stepGroup []wfv1.WorkflowStep) ([]wfv
 		if err != nil {
 			return nil, err
 		}
-		for _, newStep := range expandedStep {
-			newStepGroup = append(newStepGroup, newStep)
-		}
+
+		newStepGroup = append(newStepGroup, expandedStep...)
 	}
 	return newStepGroup, nil
 }
