@@ -9,12 +9,10 @@ import (
 )
 
 const (
-	// CLIName is the name of the CLI
 	CLIName = "tasker"
 )
 
 var (
-	// Global CLI flags
 	globalArgs globalFlags
 )
 
@@ -24,7 +22,6 @@ func init() {
 }
 
 func addKubectlFlagsToCmd(cmd *cobra.Command) {
-	// The "usual" clientcmd/kubectl flags
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
 	overrides := clientcmd.ConfigOverrides{}

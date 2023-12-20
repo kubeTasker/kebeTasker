@@ -29,20 +29,14 @@ import (
 )
 
 type WorkflowController struct {
-	// ConfigMap is the name of the config map in which to derive configuration of the controller from
 	ConfigMap string
-	// namespace for config map
 	ConfigMapNS string
 	Config      WorkflowControllerConfig
 
-	// restConfig is needed for the controller to perform manual kills of daemoned containers
-	// using remotecommand.NewSPDYExecutor().
-	// TODO(jessesuen): remove this in favor of signaling the executor (via annotation) to perform the kill
 	restConfig    *rest.Config
 	kubeclientset kubernetes.Interface
 	wfclientset   wfclientset.Interface
 
-	// datastructures to support the processing of workflows and workflow pods
 	wfInformer    cache.SharedIndexInformer
 	podInformer   cache.SharedIndexInformer
 	wfQueue       workqueue.RateLimitingInterface
@@ -52,25 +46,14 @@ type WorkflowController struct {
 
 // WorkflowControllerConfig contain the configuration settings for the workflow controller
 type WorkflowControllerConfig struct {
-	// ExecutorImage is the image name of the executor to use when running pods
 	ExecutorImage string `json:"executorImage,omitempty"`
 
-	// ExecutorResources specifies the resource requirements that will be used for the executor sidecar
 	ExecutorResources *apiv1.ResourceRequirements `json:"executorResources,omitempty"`
 
-	// ArtifactRepository contains the default location of an artifact repository for container artifacts
 	ArtifactRepository ArtifactRepository `json:"artifactRepository,omitempty"`
 
-	// Namespace is a label selector filter to limit the controller's watch to a specific namespace
 	Namespace string `json:"namespace,omitempty"`
 
-	// InstanceID is a label selector to limit the controller's watch to a specific instance. It
-	// contains an arbitrary value that is carried forward into its pod labels, under the key
-	// workflows.kubetasker.io/controller-instanceid, for the purposes of workflow segregation. This
-	// enables a controller to only receive workflow and pod events that it is interested about,
-	// in order to support multiple controllers in a single cluster, and ultimately allows the
-	// controller itself to be bundled as part of a higher level application. If omitted, the
-	// controller watches workflows and pods that *are not* labeled with an instance id.
 	InstanceID string `json:"instanceID,omitempty"`
 
 	MatchLabels map[string]string `json:"matchLabels,omitempty"`
@@ -84,20 +67,17 @@ const (
 // ArtifactRepository represents a artifact repository in which a controller will store its artifacts
 type ArtifactRepository struct {
 	S3 *S3ArtifactRepository `json:"s3,omitempty"`
-	// Future artifact repository support here
 	Artifactory *ArtifactoryArtifactRepository `json:"artifactory,omitempty"`
 }
 
 type S3ArtifactRepository struct {
 	wfv1.S3Bucket `json:",inline"`
 
-	// KeyPrefix is prefix used as part of the bucket key in which the controller will store artifacts.
 	KeyPrefix string `json:"keyPrefix,omitempty"`
 }
 
 type ArtifactoryArtifactRepository struct {
 	wfv1.ArtifactoryAuth `json:",inline"`
-	// RepoURL is the url for artifactory repo.
 	RepoURL string `json:"repoURL,omitempty"`
 }
 
@@ -120,7 +100,6 @@ func (wfc *WorkflowController) Run(ctx context.Context, wfWorkers, podWorkers in
 	defer wfc.wfQueue.ShutDown()
 	defer wfc.podQueue.ShutDown()
 
-	// log.Infof("Workflow Controller (version: %s) starting", kubeTasker.GetVersion())
 	log.Info("Watch Workflow controller config map updates")
 	_, err := wfc.watchControllerConfigMap(ctx)
 	if err != nil {
@@ -134,7 +113,6 @@ func (wfc *WorkflowController) Run(ctx context.Context, wfWorkers, podWorkers in
 	go wfc.podInformer.Run(ctx.Done())
 	go wfc.podLabeler(ctx.Done())
 
-	// Wait for all involved caches to be synced, before processing items from the queue is started
 	for _, informer := range []cache.SharedIndexInformer{wfc.wfInformer, wfc.podInformer} {
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 			log.Error("Timed out waiting for caches to sync")
@@ -194,8 +172,6 @@ func (wfc *WorkflowController) processNextItem() bool {
 		return true
 	}
 	if !exists {
-		// This happens after a workflow was labeled with completed=true
-		// or was deleted, but the work queue still had an entry for it.
 		return true
 	}
 	wf, ok := obj.(*wfv1.Workflow)
@@ -205,16 +181,10 @@ func (wfc *WorkflowController) processNextItem() bool {
 	}
 
 	if wf.ObjectMeta.Labels[common.LabelKeyCompleted] == "true" {
-		// can get here if we already added the completed=true label,
-		// but we are still draining the controller's workflow workqueue
 		return true
 	}
 	woc := newWorkflowOperationCtx(wf, wfc)
 	woc.operate()
-	// TODO: operate should return error if it was unable to operate properly
-	// so we can requeue the work for a later time
-	// See: https://github.com/kubernetes/client-go/blob/master/examples/workqueue/main.go
-	//c.handleErr(err, key)
 	return true
 }
 
@@ -224,8 +194,6 @@ func (wfc *WorkflowController) podWorker() {
 }
 
 // processNextPodItem is the worker logic for handling pod updates.
-// For pods updates, this simply means to "wake up" the workflow by
-// adding the corresponding workflow key into the workflow workqueue.
 func (wfc *WorkflowController) processNextPodItem() bool {
 	key, quit := wfc.podQueue.Get()
 	if quit {
@@ -239,9 +207,6 @@ func (wfc *WorkflowController) processNextPodItem() bool {
 		return true
 	}
 	if !exists {
-		// we can get here if pod was queued into the pod workqueue,
-		// but it was either deleted or labeled completed by the time
-		// we dequeued it.
 		return true
 	}
 	pod, ok := obj.(*apiv1.Pod)
@@ -255,13 +220,9 @@ func (wfc *WorkflowController) processNextPodItem() bool {
 	}
 	workflowName, ok := pod.Labels[common.LabelKeyWorkflow]
 	if !ok {
-		// Ignore pods unrelated to workflow (this shouldn't happen unless the watch is setup incorrectly)
 		log.Warnf("watch returned pod unrelated to any workflow: %s", pod.ObjectMeta.Name)
 		return true
 	}
-	// TODO: currently we reawaken the workflow on *any* pod updates.
-	// But this could be be much improved to become smarter by only
-	// requeue the workflow when there are changes that we care about.
 	wfc.wfQueue.Add(pod.ObjectMeta.Namespace + "/" + workflowName)
 	return true
 }
@@ -317,7 +278,6 @@ func (wfc *WorkflowController) instanceIDRequirement() labels.Requirement {
 func (wfc *WorkflowController) tweakWorkflowlist(options *metav1.ListOptions) {
 	options.FieldSelector = fields.Everything().String()
 
-	// completed notin (true)
 	incompleteReq, err := labels.NewRequirement(common.LabelKeyCompleted, selection.NotIn, []string{"true"})
 	if err != nil {
 		panic(err)
@@ -351,8 +311,6 @@ func (wfc *WorkflowController) newWorkflowInformer() cache.SharedIndexInformer {
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-				// key function.
 				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				if err == nil {
 					wfc.wfQueue.Add(key)
@@ -472,8 +430,6 @@ func (wfc *WorkflowController) newPodInformer() cache.SharedIndexInformer {
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-				// key function.
 				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 				if err == nil {
 					wfc.podQueue.Add(key)

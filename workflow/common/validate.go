@@ -15,20 +15,13 @@ import (
 // wfValidationCtx is the context for validating a workflow spec
 type wfValidationCtx struct {
 	wf *wfv1.Workflow
-	// globalParams keeps track of variables which are available the global
-	// scope and can be referenced from anywhere.
 	globalParams map[string]string
-	// results tracks if validation has already been run on a template
 	results map[string]bool
 }
 
 const (
-	// placeholderValue is an arbitrary string to perform mock substitution of variables
 	placeholderValue = "placeholder"
 
-	// anyItemMagicValue is a magic value set in addItemsToScope() and checked in
-	// resolveAllVariables() to determine if any {{item.name}} can be accepted during
-	// variable resolution (to support withParam)
 	anyItemMagicValue = "item.*"
 )
 
@@ -71,7 +64,6 @@ func ValidateWorkflow(wf *wfv1.Workflow) error {
 		if exitTmpl == nil {
 			return errors.Errorf(errors.CodeBadRequest, "spec.onExit template '%s' undefined", ctx.wf.Spec.OnExit)
 		}
-		// now when validating onExit, {{workflow.status}} is now available as a global
 		ctx.globalParams[GlobalVarWorkflowStatus] = placeholderValue
 		err = ctx.validateTemplate(exitTmpl, ctx.wf.Spec.Arguments)
 		if err != nil {
@@ -84,7 +76,6 @@ func ValidateWorkflow(wf *wfv1.Workflow) error {
 func (ctx *wfValidationCtx) validateTemplate(tmpl *wfv1.Template, args wfv1.Arguments) error {
 	_, ok := ctx.results[tmpl.Name]
 	if ok {
-		// we already processed this template
 		return nil
 	}
 	ctx.results[tmpl.Name] = true
@@ -99,7 +90,6 @@ func (ctx *wfValidationCtx) validateTemplate(tmpl *wfv1.Template, args wfv1.Argu
 	for globalVar, val := range ctx.globalParams {
 		scope[globalVar] = val
 	}
-	// the following validates that only one template type is defined
 	tmplTypes := 0
 	if tmpl.Container != nil {
 		tmplTypes++
@@ -179,7 +169,6 @@ func validateArtifactLocation(errPrefix string, art wfv1.Artifact) error {
 			return errors.Errorf(errors.CodeBadRequest, "%s.git.repo is required", errPrefix)
 		}
 	}
-	// TODO: validate other artifact locations
 	return nil
 }
 
@@ -193,8 +182,6 @@ func resolveAllVariables(scope map[string]interface{}, tmplStr string) error {
 		_, ok := scope[tag]
 		if !ok && unresolvedErr == nil {
 			if (tag == "item" || strings.HasPrefix(tag, "item.")) && allowAllItemRefs {
-				// we are *probably* referencing a undetermined item using withParam
-				// NOTE: this is far from foolproof.
 			} else {
 				unresolvedErr = fmt.Errorf("failed to resolve {{%s}}", tag)
 			}
@@ -318,8 +305,6 @@ func addItemsToScope(step *wfv1.WorkflowStep, scope map[string]interface{}) erro
 		}
 	} else if step.WithParam != "" {
 		scope["item"] = true
-		// 'item.*' is magic placeholder value which resolveAllVariables() will look for
-		// when considering if all variables are resolveable.
 		scope[anyItemMagicValue] = true
 	}
 	return nil
@@ -375,11 +360,7 @@ func validateOutputs(scope map[string]interface{}, tmpl *wfv1.Template) error {
 	return nil
 }
 
-// validateWorkflowFieldNames accepts a slice of structs and
-// verifies that the Name field of the structs are:
-// * unique
-// * non-empty
-// * matches matches our regex requirements
+// validateWorkflowFieldNames accepts a slice of structs 
 func validateWorkflowFieldNames(slice interface{}) error {
 	s := reflect.ValueOf(slice)
 	if s.Kind() != reflect.Slice {

@@ -113,7 +113,6 @@ func submitWorkflow(wf *wfv1.Workflow) (string, error) {
 		}
 		for _, param := range wf.Spec.Arguments.Parameters {
 			if _, ok := passedParams[param.Name]; ok {
-				// this parameter was overridden via command line
 				continue
 			}
 			newParams = append(newParams, param)

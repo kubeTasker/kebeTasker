@@ -26,9 +26,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-// FindOverlappingVolume looks an artifact path, checks if it overlaps with any
-// user specified volumeMounts in the template, and returns the deepest volumeMount
-// (if any).
+// FindOverlappingVolume looks an artifact path
 func FindOverlappingVolume(tmpl *wfv1.Template, path string) *apiv1.VolumeMount {
 	if tmpl.Container == nil {
 		return nil
@@ -48,14 +46,11 @@ func FindOverlappingVolume(tmpl *wfv1.Template, path string) *apiv1.VolumeMount 
 }
 
 // KillPodContainer is a convenience function to issue a kill signal to a container in a pod
-// It gives a 15 second grace period before issuing SIGKILL
-// NOTE: this only works with containers that have sh
 func KillPodContainer(restConfig *rest.Config, namespace string, pod string, container string) error {
 	exec, err := ExecPodContainer(restConfig, namespace, pod, container, true, true, "sh", "-c", "kill 1; sleep 15; kill -9 1")
 	if err != nil {
 		return err
 	}
-	// Stream will initiate the command. We do want to wait for the result so we launch as a goroutine
 	go func() {
 		_, _, err := GetExecutorOutput(exec)
 		if err != nil {
@@ -117,21 +112,12 @@ func DefaultConfigMapName(controllerName string) string {
 }
 
 // ProcessArgs sets in the inputs, the values either passed via arguments, or the hardwired values
-// It also substitutes parameters in the template from the arguments
-// It will also substitute any global variables referenced in template
-// (e.g. {{workflow.parameters.XX}}, {{workflow.name}}, {{workflow.status}})
 func ProcessArgs(tmpl *wfv1.Template, args wfv1.Arguments, globalParams map[string]string, validateOnly bool) (*wfv1.Template, error) {
-	// For each input parameter:
-	// 1) check if was supplied as argument. if so use the supplied value from arg
-	// 2) if not, use default value.
-	// 3) if no default value, it is an error
 	tmpl = tmpl.DeepCopy()
 	for i, inParam := range tmpl.Inputs.Parameters {
 		if inParam.Default != nil {
-			// first set to default value
 			inParam.Value = inParam.Default
 		}
-		// overwrite value from argument (if supplied)
 		argParam := args.GetParameterByName(inParam.Name)
 		if argParam != nil && argParam.Value != nil {
 			newValue := *argParam.Value
@@ -149,12 +135,10 @@ func ProcessArgs(tmpl *wfv1.Template, args wfv1.Arguments, globalParams map[stri
 
 	newInputArtifacts := make([]wfv1.Artifact, len(tmpl.Inputs.Artifacts))
 	for i, inArt := range tmpl.Inputs.Artifacts {
-		// if artifact has hard-wired location, we prefer that
 		if inArt.HasLocation() {
 			newInputArtifacts[i] = inArt
 			continue
 		}
-		// artifact must be supplied
 		argArt := args.GetArtifactByName(inArt.Name)
 		if argArt == nil {
 			return nil, errors.Errorf(errors.CodeBadRequest, "inputs.artifacts.%s was not supplied", inArt.Name)
@@ -173,8 +157,6 @@ func substituteParams(tmpl *wfv1.Template, globalParams map[string]string) (*wfv
 	if err != nil {
 		return nil, errors.InternalWrapError(err)
 	}
-	// First replace globals then replace inputs because globals could be referenced in the
-	// inputs. Note globals cannot be unresolved
 	fstTmpl := fasttemplate.New(string(tmplBytes), "{{", "}}")
 	globalReplacedTmplStr, err := Replace(fstTmpl, globalParams, false, "workflow.")
 	if err != nil {
@@ -185,7 +167,6 @@ func substituteParams(tmpl *wfv1.Template, globalParams map[string]string) (*wfv
 	if err != nil {
 		return nil, errors.InternalWrapError(err)
 	}
-	// Now replace the rest of substitutions (the ones that can be made) in the template
 	replaceMap := make(map[string]string)
 	for _, inParam := range globalReplacedTmpl.Inputs.Parameters {
 		if inParam.Value == nil {
@@ -207,9 +188,6 @@ func substituteParams(tmpl *wfv1.Template, globalParams map[string]string) (*wfv
 }
 
 // Replace executes basic string substitution of a template with replacement values.
-// allowUnresolved indicates whether or not it is acceptable to have unresolved variables
-// remaining in the substituted template. prefixFilter will apply the replacements only
-// to variables with the specified prefix
 func Replace(fstTmpl *fasttemplate.Template, replaceMap map[string]string, allowUnresolved bool, prefixFilter string) (string, error) {
 	var unresolvedErr error
 	replacedTmpl := fstTmpl.ExecuteFuncString(func(w io.Writer, tag string) (int, error) {
@@ -219,14 +197,11 @@ func Replace(fstTmpl *fasttemplate.Template, replaceMap map[string]string, allow
 		replacement, ok := replaceMap[tag]
 		if !ok {
 			if allowUnresolved {
-				// just write the same string back
 				return w.Write([]byte(fmt.Sprintf("{{%s}}", tag)))
 			}
 			unresolvedErr = errors.Errorf(errors.CodeBadRequest, "failed to resolve {{%s}}", tag)
 			return 0, nil
 		}
-		// The following escapes any special characters (e.g. newlines, tabs, etc...)
-		// in preparation for substitution
 		replacement = strconv.Quote(replacement)
 		replacement = replacement[1 : len(replacement)-1]
 		return w.Write([]byte(replacement))

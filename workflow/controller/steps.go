@@ -49,15 +49,11 @@ func (woc *wfOperationCtx) executeSteps(nodeName string, tmpl *wfv1.Template) er
 			return nil
 		}
 
-		// HACK: need better way to add children to scope
 		for _, step := range stepGroup {
 			childNodeName := fmt.Sprintf("%s.%s", sgNodeName, step.Name)
 			childNodeID := woc.wf.NodeID(childNodeName)
 			childNode, ok := woc.wf.Status.Nodes[childNodeID]
 			if !ok {
-				// This can happen if there was `withItem` expansion
-				// it is okay to ignore this because these expanded steps
-				// are not easily referenceable by user.
 				continue
 			}
 			if childNode.PodIP != "" {
@@ -95,7 +91,6 @@ func (woc *wfOperationCtx) executeSteps(nodeName string, tmpl *wfv1.Template) er
 }
 
 // executeStepGroup examines a map of parallel steps and executes them in parallel.
-// Handles referencing of variables in scope, expands `withItem` clauses, and evaluates `when` expressions
 func (woc *wfOperationCtx) executeStepGroup(stepGroup []wfv1.WorkflowStep, sgNodeName string, scope *wfScope) error {
 	nodeID := woc.wf.NodeID(sgNodeName)
 	node, ok := woc.wf.Status.Nodes[nodeID]
@@ -108,26 +103,22 @@ func (woc *wfOperationCtx) executeStepGroup(stepGroup []wfv1.WorkflowStep, sgNod
 		woc.log.Infof("Initializing step group node %v", node)
 	}
 
-	// First, resolve any references to outputs from previous steps, and perform substitution
 	stepGroup, err := woc.resolveReferences(stepGroup, scope)
 	if err != nil {
 		woc.markNodeError(sgNodeName, err)
 		return err
 	}
 
-	// Next, expand the step's withItems (if any)
 	stepGroup, err = woc.expandStepGroup(stepGroup)
 	if err != nil {
 		woc.markNodeError(sgNodeName, err)
 		return err
 	}
 
-	// Kick off all parallel steps in the group
 	for _, step := range stepGroup {
 		childNodeName := fmt.Sprintf("%s.%s", sgNodeName, step.Name)
 		woc.addChildNode(sgNodeName, childNodeName)
 
-		// Check the step's when clause to decide if it should execute
 		proceed, err := shouldExecute(step.When)
 		if err != nil {
 			woc.markNodeError(childNodeName, err)
@@ -151,13 +142,11 @@ func (woc *wfOperationCtx) executeStepGroup(stepGroup []wfv1.WorkflowStep, sgNod
 	}
 
 	node = woc.wf.Status.Nodes[nodeID]
-	// Return if not all children completed
 	for _, childNodeID := range node.Children {
 		if !woc.wf.Status.Nodes[childNodeID].Completed() {
 			return nil
 		}
 	}
-	// All children completed. Determine step group status as a whole
 	for _, childNodeID := range node.Children {
 		childNode := woc.wf.Status.Nodes[childNodeID]
 		if !childNode.Successful() {
@@ -197,18 +186,10 @@ func shouldExecute(when string) (bool, error) {
 }
 
 // resolveReferences replaces any references to outputs of previous steps, or artifacts in the inputs
-// NOTE: by now, input parameters should have been substituted throughout the template, so we only
-// are concerned with:
-// 1) dereferencing output.parameters from previous steps
-// 2) dereferencing output.result from previous steps
-// 2) dereferencing artifacts from previous steps
-// 3) dereferencing artifacts from inputs
 func (woc *wfOperationCtx) resolveReferences(stepGroup []wfv1.WorkflowStep, scope *wfScope) ([]wfv1.WorkflowStep, error) {
 	newStepGroup := make([]wfv1.WorkflowStep, len(stepGroup))
 
 	for i, step := range stepGroup {
-		// Step 1: replace all parameter scope references in the step
-		// TODO: improve this
 		stepBytes, err := json.Marshal(step)
 		if err != nil {
 			return nil, errors.InternalWrapError(err)
@@ -231,7 +212,6 @@ func (woc *wfOperationCtx) resolveReferences(stepGroup []wfv1.WorkflowStep, scop
 			return nil, errors.InternalWrapError(err)
 		}
 
-		// Step 2: replace all artifact references
 		for j, art := range newStep.Arguments.Artifacts {
 			if art.From == "" {
 				continue
@@ -284,7 +264,6 @@ func (woc *wfOperationCtx) expandStep(step wfv1.WorkflowStep) ([]wfv1.WorkflowSt
 			return nil, errors.Errorf(errors.CodeBadRequest, "withParam value not be parsed as a JSON list: %s", step.WithParam)
 		}
 	} else {
-		// this should have been prevented in expandStepGroup()
 		return nil, errors.InternalError("expandStep() was called with withItems and withParam empty")
 	}
 
@@ -302,10 +281,6 @@ func (woc *wfOperationCtx) expandStep(step wfv1.WorkflowStep) ([]wfv1.WorkflowSt
 }
 
 // killDeamonedChildren kill any granchildren of a step template node, which have been daemoned.
-// We only need to check grandchildren instead of children because the direct children of a step
-// template are actually stepGroups, which are nodes that cannot represent actual containers.
-// Returns the first error that occurs (if any)
-// TODO(jessesuen): this logic will need to change with DAGs
 func (woc *wfOperationCtx) killDeamonedChildren(nodeID string) error {
 	woc.log.Infof("Checking deamon children of %s", nodeID)
 	var firstErr error
@@ -349,11 +324,6 @@ func (woc *wfOperationCtx) updateExecutionControl(podName string, execCtl common
 		return err
 	}
 
-	// Ideally we would simply annotate the pod with the updates and be done with it, allowing
-	// the executor to notice the updates naturally via the Downward API annotations volume
-	// mounted file. However, updates to the Downward API volumes take a very long time to
-	// propagate (minutes). The following code fast-tracks this by signaling the executor
-	// using SIGUSR2 that something changed.
 	woc.log.Infof("Signalling %s of updates", podName)
 	exec, err := common.ExecPodContainer(
 		woc.controller.restConfig, woc.wf.ObjectMeta.Namespace, podName,
@@ -363,8 +333,6 @@ func (woc *wfOperationCtx) updateExecutionControl(podName string, execCtl common
 		return err
 	}
 	go func() {
-		// This call is necessary to actually send the exec. Since signalling is best effort,
-		// it is launched as a goroutine and the error is discarded
 		_, _, err = common.GetExecutorOutput(exec)
 		if err != nil {
 			log.Warnf("Signal command failed: %v", err)

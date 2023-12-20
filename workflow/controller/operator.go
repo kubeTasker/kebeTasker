@@ -25,34 +25,18 @@ import (
 
 // wfOperationCtx is the context for evaluation and operation of a single workflow
 type wfOperationCtx struct {
-	// wf is the workflow object
 	wf *wfv1.Workflow
-	// orig is the original workflow object for purposes of creating a patch
 	orig *wfv1.Workflow
-	// updated indicates whether or not the workflow object itself was updated
-	// and needs to be persisted back to kubernetes
 	updated bool
-	// log is an logrus logging context to corrolate logs with a workflow
 	log *log.Entry
-	// controller reference to workflow controller
 	controller *WorkflowController
-	// globalParms holds any parameters that are available to be referenced
-	// in the global scope (e.g. workflow.parameters.XXX).
 	globalParams map[string]string
-	// map of pods which need to be labeled with completed=true
 	completedPods map[string]bool
-	// deadline is the dealine time in which this operation should relinquish
-	// its hold on the workflow so that an operation does not run for too long
-	// and starve other workqueue items. It also enables workflow progress to
-	// be periodically synced to the database.
 	deadline time.Time
 }
 
-// maxOperationTime is the maximum time a workflow operation is allowed to run
-// for before requeuing the workflow onto the workqueue.
 const maxOperationTime time.Duration = 10 * time.Second
 
-// wfScope contains the current scope of variables available when iterating steps in a workflow
 type wfScope struct {
 	tmpl  *wfv1.Template
 	scope map[string]interface{}
@@ -60,9 +44,6 @@ type wfScope struct {
 
 // newWorkflowOperationCtx creates and initializes a new wfOperationCtx object.
 func newWorkflowOperationCtx(wf *wfv1.Workflow, wfc *WorkflowController) *wfOperationCtx {
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
 	woc := wfOperationCtx{
 		wf:      wf.DeepCopyObject().(*wfv1.Workflow),
 		orig:    wf,
@@ -85,10 +66,6 @@ func newWorkflowOperationCtx(wf *wfv1.Workflow, wfc *WorkflowController) *wfOper
 }
 
 // operate is the main operator logic of a workflow.
-// It evaluates the current state of the workflow, and its pods
-// and decides how to proceed down the execution path.
-// TODO: an error returned by this method should result in requeing the
-// workflow to be retried at a later time
 func (woc *wfOperationCtx) operate() {
 	defer woc.persistUpdates()
 	defer func() {
@@ -102,7 +79,6 @@ func (woc *wfOperationCtx) operate() {
 		}
 	}()
 	woc.log.Infof("Processing workflow")
-	// Perform one-time workflow validation
 	if woc.wf.Status.Phase == "" {
 		woc.markWorkflowRunning()
 		err := common.ValidateWorkflow(woc.wf)
@@ -114,7 +90,6 @@ func (woc *wfOperationCtx) operate() {
 		err := woc.podReconciliation()
 		if err != nil {
 			woc.log.Errorf("%s error: %+v", woc.wf.ObjectMeta.Name, err)
-			// TODO: we need to re-add to the workqueue, but should happen in caller
 			return
 		}
 	}
@@ -133,9 +108,6 @@ func (woc *wfOperationCtx) operate() {
 	err = woc.executeTemplate(woc.wf.Spec.Entrypoint, woc.wf.Spec.Arguments, woc.wf.ObjectMeta.Name)
 	if err != nil {
 		if errors.IsCode(errors.CodeTimeout, err) {
-			// A timeout indicates we took too long operating on the workflow.
-			// Return so we can persist all the work we have done so far, and
-			// requeue the workflow for another day. TODO: move this into the caller
 			woc.requeue()
 			return
 		}
@@ -149,7 +121,6 @@ func (woc *wfOperationCtx) operate() {
 	var onExitNode *wfv1.NodeStatus
 	if woc.wf.Spec.OnExit != "" {
 		if node.Phase == wfv1.NodeSkipped {
-			// treat skipped the same as Succeeded for workflow.status
 			woc.globalParams[common.GlobalVarWorkflowStatus] = string(wfv1.NodeSucceeded)
 		} else {
 			woc.globalParams[common.GlobalVarWorkflowStatus] = string(node.Phase)
@@ -174,21 +145,13 @@ func (woc *wfOperationCtx) operate() {
 	err = woc.deletePVCs()
 	if err != nil {
 		woc.log.Errorf("%s error: %+v", woc.wf.ObjectMeta.Name, err)
-		// Mark the workflow with an error message and return, but intentionally do not
-		// markCompletion so that we can retry PVC deletion (TODO: use workqueue.ReAdd())
-		// This error phase may be cleared if a subsequent delete attempt is successful.
 		woc.markWorkflowError(err, false)
 		return
 	}
 
-	// If we get here, the workflow completed, all PVCs were deleted successfully, and
-	// exit handlers were executed. We now need to infer the workflow phase from the
-	// node phase.
 	switch node.Phase {
 	case wfv1.NodeSucceeded, wfv1.NodeSkipped:
 		if onExitNode != nil && !onExitNode.Successful() {
-			// if main workflow succeeded, but the exit node was unsuccessful
-			// the workflow is now considered unsuccessful.
 			woc.markWorkflowPhase(onExitNode.Phase, true, onExitNode.Message)
 		} else {
 			woc.markWorkflowSuccess()
@@ -198,15 +161,12 @@ func (woc *wfOperationCtx) operate() {
 	case wfv1.NodeError:
 		woc.markWorkflowPhase(wfv1.NodeError, true, node.Message)
 	default:
-		// NOTE: we should never make it here because if the the node was 'Running'
-		// we should have returned earlier.
 		err = errors.InternalErrorf("Unexpected node phase %s: %+v", woc.wf.ObjectMeta.Name, err)
 		woc.markWorkflowError(err, true)
 	}
 }
 
 // persistUpdates will update a workflow with any updates made during workflow operation.
-// It also labels any pods as completed if we have extracted everything we need from it.
 func (woc *wfOperationCtx) persistUpdates() {
 	if !woc.updated {
 		return
@@ -235,17 +195,9 @@ func (woc *wfOperationCtx) persistUpdates() {
 			return
 		}
 		woc.log.Info("Patch successful")
-		// HACK(jessesuen) after we successfully persist an update to the workflow, the informer's
-		// cache is now invalid. It's very common that we will need to immediately re-operate on a
-		// workflow due to queuing by the pod workers. The following sleep gives a *chance* for the
-		// informer's cache to catch up to the version of the workflow we just persisted. Without
-		// this sleep, the next worker to work on this workflow will very likely operate on a stale
-		// object and redo work.
 		time.Sleep(1 * time.Second)
 	}
 
-	// It is important that we *never* label pods as completed until we successfully updated the workflow
-	// Failing to do so means we can have inconsistent state.
 	for podName := range woc.completedPods {
 		woc.controller.completedPods <- fmt.Sprintf("%s/%s", woc.wf.ObjectMeta.Namespace, podName)
 	}
@@ -275,7 +227,6 @@ func (woc *wfOperationCtx) processNodeRetries(node *wfv1.NodeStatus) error {
 	}
 
 	if !lastChildNode.Completed() {
-		// last child node is still running.
 		return nil
 	}
 
@@ -303,9 +254,6 @@ func (woc *wfOperationCtx) processNodeRetries(node *wfv1.NodeStatus) error {
 }
 
 // podReconciliation is the process by which a workflow will examine all its related
-// pods and update the node state before continuing the evaluation of the workflow.
-// Records all pods which were observed completed, which will be labeled completed=true
-// after successful persist of the workflow.
 func (woc *wfOperationCtx) podReconciliation() error {
 	podList, err := woc.getAllWorkflowPods()
 	if err != nil {
@@ -328,28 +276,13 @@ func (woc *wfOperationCtx) podReconciliation() error {
 	}
 
 	if len(podList.Items) > 0 {
-		// if we saw related pods, no need to check for deleted pods yet.
-		// we will get to them eventually.
 		return nil
 	}
-	// If we get here, our initial query for pods related to this workflow returned nothing.
-	// Note that our initial query excludes Pending/completed=true pods for performance reasons
-	// since there's generally no action needed to be taken on pending pods or ones we have
-	// already processed (completed=true).
-	// There are a few scenarios where the pod list would have been empty:
-	//  1. workflow's pods are still pending (best case scenario)
-	//  2. workflow's pods were deleted unbeknownst to the controller
-	//  3. workflow's pods were marked completed=true, but we are operating on a stale workflow object
-	//  4. combination of any the above scenarios
-	// In order to detect deleted pods, we repeat the pod reconciliation process, this time
-	// including ALL workflow pods in the query. If any one of our nodes does not show up in this
-	// returned list, it implies that the pod was deleted without the controller seeing the event.
 	woc.log.Info("Checking for deleted pods")
 	podList, err = woc.getAllWorkflowPods()
 	if err != nil {
 		return err
 	}
-	// Repeat the node assessment
 	for _, pod := range podList.Items {
 		nodeNameForPod := pod.Annotations[common.AnnotationKeyNodeName]
 		nodeID := woc.wf.NodeID(nodeNameForPod)
@@ -365,13 +298,8 @@ func (woc *wfOperationCtx) podReconciliation() error {
 		}
 	}
 
-	// Now iterate the workflow pod nodes which we still believe to be incomplete.
-	// If the pod was not seen in the pod list, it means the pod was deleted and it
-	// is now impossible to infer status. The only thing we can do at this point is
-	// to mark the node with Error.
 	for nodeID, node := range woc.wf.Status.Nodes {
 		if len(node.Children) > 0 || node.Completed() {
-			// node is not a pod, or it is already complete
 			continue
 		}
 
@@ -430,16 +358,13 @@ func assessNodeStatus(pod *apiv1.Pod, node *wfv1.NodeStatus) *wfv1.NodeStatus {
 			return nil
 		}
 		if tmpl.Daemon == nil || !*tmpl.Daemon {
-			// incidental state change of a running pod. No need to inspect further
 			return nil
 		}
-		// pod is running and template is marked daemon. check if everything is ready
 		for _, ctrStatus := range pod.Status.ContainerStatuses {
 			if !ctrStatus.Ready {
 				return nil
 			}
 		}
-		// proceed to mark node status as succeeded (and daemoned)
 		newPhase = wfv1.NodeSucceeded
 		t := true
 		newDaemonStatus = &t
@@ -452,8 +377,6 @@ func assessNodeStatus(pod *apiv1.Pod, node *wfv1.NodeStatus) *wfv1.NodeStatus {
 
 	if newDaemonStatus != nil {
 		if *newDaemonStatus == false {
-			// if the daemon status switched to false, we prefer to just unset daemoned status field
-			// (as opposed to setting it to false)
 			newDaemonStatus = nil
 		}
 		if (newDaemonStatus != nil && node.Daemoned == nil) || (newDaemonStatus == nil && node.Daemoned != nil) {
@@ -461,7 +384,6 @@ func assessNodeStatus(pod *apiv1.Pod, node *wfv1.NodeStatus) *wfv1.NodeStatus {
 			node.Daemoned = newDaemonStatus
 			updated = true
 			if pod.Status.PodIP != "" && pod.Status.PodIP != node.PodIP {
-				// only update Pod IP for daemoned nodes to reduce number of updates
 				log.Infof("Updating daemon node %s IP %s -> %s", node, node.PodIP, pod.Status.PodIP)
 				node.PodIP = pod.Status.PodIP
 			}
@@ -495,8 +417,6 @@ func assessNodeStatus(pod *apiv1.Pod, node *wfv1.NodeStatus) *wfv1.NodeStatus {
 			node.FinishedAt = getLatestFinishedAt(pod)
 		}
 		if node.FinishedAt.IsZero() {
-			// If we get here, the container is daemoned so the
-			// finishedAt might not have been set.
 			node.FinishedAt = metav1.Time{Time: time.Now().UTC()}
 		}
 	}
@@ -527,16 +447,11 @@ func getLatestFinishedAt(pod *apiv1.Pod) metav1.Time {
 // Returns a tuple of the new phase and message
 func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 	if pod.Status.Message != "" {
-		// Pod has a nice error message. Use that.
 		return wfv1.NodeFailed, pod.Status.Message
 	}
 	annotatedMsg := pod.Annotations[common.AnnotationKeyNodeMessage]
-	// We only get one message to set for the overall node status.
-	// If mutiple containers failed, in order of preference:
-	// init, main (annotated), main (exit code), wait, sidecars
 	for _, ctr := range pod.Status.InitContainerStatuses {
 		if ctr.State.Terminated == nil {
-			// We should never get here
 			log.Warnf("Pod %s phase was Failed but %s did not have terminated state", pod.ObjectMeta.Name, ctr.Name)
 			continue
 		}
@@ -550,13 +465,11 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 				break
 			}
 		}
-		// NOTE: we consider artifact load issues as Error instead of Failed
 		return wfv1.NodeError, errMsg
 	}
 	failMessages := make(map[string]string)
 	for _, ctr := range pod.Status.ContainerStatuses {
 		if ctr.State.Terminated == nil {
-			// We should never get here
 			log.Warnf("Pod %s phase was Failed but %s did not have terminated state", pod.ObjectMeta.Name, ctr.Name)
 			continue
 		}
@@ -572,9 +485,6 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 				}
 			}
 			if errDetails == "" {
-				// executor is expected to annotate a message to the pod upon any errors.
-				// If we failed to see the annotated message, it is likely the pod ran with
-				// insufficient privileges. Give a hint to that effect.
 				errDetails = fmt.Sprintf("verify serviceaccount %s:%s has necessary privileges", pod.ObjectMeta.Namespace, pod.Spec.ServiceAccountName)
 			}
 			errMsg := fmt.Sprintf("failed to save outputs: %s", errDetails)
@@ -595,8 +505,6 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 		_, ok = failMessages[common.WaitContainerName]
 		isResourceTemplate := !ok
 		if isResourceTemplate && annotatedMsg != "" {
-			// For resource templates, we prefer the annotated message
-			// over the vanilla exit code 1 error
 			return wfv1.NodeFailed, annotatedMsg
 		}
 		return wfv1.NodeFailed, failMsg
@@ -605,16 +513,6 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 		return wfv1.NodeError, failMsg
 	}
 
-	// If we get here, both the main and wait container succeeded.
-	// Identify the sidecar which failed and give proper message
-	// NOTE: we may need to distinguish between the main container
-	// succeeding and ignoring the sidecar statuses. This is because
-	// executor may have had to forcefully terminate a sidecar
-	// (kill -9), resulting in an non-zero exit code of a sidecar,
-	// and overall pod status as failed. Or the sidecar is actually
-	// *expected* to fail non-zero and should be ignored. Users may
-	// want the option to consider a step failed only if the main
-	// container failed. For now return the first failure.
 	for _, failMsg := range failMessages {
 		return wfv1.NodeFailed, failMsg
 	}
@@ -623,13 +521,9 @@ func inferFailedReason(pod *apiv1.Pod) (wfv1.NodePhase, string) {
 
 func (woc *wfOperationCtx) createPVCs() error {
 	if woc.wf.Status.Phase != wfv1.NodeRunning {
-		// Only attempt to create PVCs if workflow transitioned to Running state
-		// (e.g. passed validation, or didn't already complete)
 		return nil
 	}
 	if len(woc.wf.Spec.VolumeClaimTemplates) == len(woc.wf.Status.PersistentVolumeClaims) {
-		// If we have already created the PVCs, then there is nothing to do.
-		// This will also handle the case where workflow has no volumeClaimTemplates.
 		return nil
 	}
 	if len(woc.wf.Status.PersistentVolumeClaims) == 0 {
@@ -641,7 +535,6 @@ func (woc *wfOperationCtx) createPVCs() error {
 			return errors.Errorf(errors.CodeBadRequest, "volumeClaimTemplates[%d].metadata.name is required", i)
 		}
 		pvcTmpl = *pvcTmpl.DeepCopy()
-		// PVC name will be <workflowname>-<volumeclaimtemplatename>
 		refName := pvcTmpl.ObjectMeta.Name
 		pvcName := fmt.Sprintf("%s-%s", woc.wf.ObjectMeta.Name, pvcTmpl.ObjectMeta.Name)
 		woc.log.Infof("Creating pvc %s", pvcName)
@@ -671,12 +564,10 @@ func (woc *wfOperationCtx) createPVCs() error {
 func (woc *wfOperationCtx) deletePVCs() error {
 	totalPVCs := len(woc.wf.Status.PersistentVolumeClaims)
 	if totalPVCs == 0 {
-		// PVC list already empty. nothing to do
 		return nil
 	}
 	pvcClient := woc.controller.kubeclientset.CoreV1().PersistentVolumeClaims(woc.wf.ObjectMeta.Namespace)
 	newPVClist := make([]apiv1.Volume, 0)
-	// Attempt to delete all PVCs. Record first error encountered
 	var firstErr error
 	for _, pvc := range woc.wf.Status.PersistentVolumeClaims {
 		woc.log.Infof("Deleting PVC %s", pvc.PersistentVolumeClaim.ClaimName)
@@ -692,7 +583,6 @@ func (woc *wfOperationCtx) deletePVCs() error {
 		}
 	}
 	if len(newPVClist) != totalPVCs {
-		// we were successful in deleting one ore more PVCs
 		woc.log.Infof("Deleted %d/%d PVCs", totalPVCs-len(newPVClist), totalPVCs)
 		woc.wf.Status.PersistentVolumeClaims = newPVClist
 		woc.updated = true
@@ -753,7 +643,6 @@ func (woc *wfOperationCtx) executeTemplate(templateName string, args wfv1.Argume
 					return err
 				}
 
-				// The updated node status could've changed. Get the latest copy of the node.
 				node = woc.getNode(node.Name)
 				log.Infof("Node %s: Status: %s", node.Name, node.Phase)
 				if node.Completed() {
@@ -764,25 +653,13 @@ func (woc *wfOperationCtx) executeTemplate(templateName string, args wfv1.Argume
 					return err
 				}
 				if !lastChildNode.Completed() {
-					// last child node is still running.
 					return nil
 				}
 			} else {
-				// There are no retries configured and there's already a node entry for the container.
-				// This means the container was already scheduled (or had a create pod error). Nothing
-				// to more to do with this node.
 				return nil
 			}
 		}
 
-		// If the user has specified retries, a special "retries" non-leaf node
-		// is created. This node acts as the parent of all retries that will be
-		// done for the container. The status of this node should be "Success"
-		// if any of the retries succeed. Otherwise, it is "Failed".
-
-		// TODO(shri): Mark the current node as a "retry" node
-		// Create a new child node as the first attempt node and
-		// run the template in that node.
 		nodeToExecute := nodeName
 		if tmpl.RetryStrategy != nil {
 			node := woc.markNodePhase(nodeName, wfv1.NodeRunning)
@@ -791,14 +668,12 @@ func (woc *wfOperationCtx) executeTemplate(templateName string, args wfv1.Argume
 			node.RetryStrategy.Limit = tmpl.RetryStrategy.Limit
 			woc.wf.Status.Nodes[nodeID] = *node
 
-			// Create new node as child of 'node'
 			newContainerName := fmt.Sprintf("%s(%d)", nodeName, len(node.Children))
 			woc.markNodePhase(newContainerName, wfv1.NodeRunning)
 			woc.addChildNode(nodeName, newContainerName)
 			nodeToExecute = newContainerName
 		}
 
-		// We have not yet created the pod
 		err = woc.executeContainer(nodeToExecute, tmpl)
 	case wfv1.TemplateTypeSteps:
 		if !ok {
@@ -829,7 +704,6 @@ func (woc *wfOperationCtx) executeTemplate(templateName string, args wfv1.Argume
 }
 
 // markWorkflowPhase is a convenience method to set the phase of the workflow with optional message
-// optionally marks the workflow completed, which sets the finishedAt timestamp and completed label
 func (woc *wfOperationCtx) markWorkflowPhase(phase wfv1.NodePhase, markCompleted bool, message ...string) {
 	if woc.wf.Status.Phase != phase {
 		woc.log.Infof("Updated phase %s -> %s", woc.wf.Status.Phase, phase)
@@ -990,7 +864,6 @@ func (wfs *wfScope) resolveVar(v string) (interface{}, error) {
 		return val, nil
 	}
 	parts := strings.Split(v, ".")
-	// HACK (assuming it is an input artifact)
 	art := wfs.tmpl.Inputs.GetArtifactByName(parts[2])
 	if art != nil {
 		return *art, nil
@@ -1035,7 +908,6 @@ func (woc *wfOperationCtx) addChildNode(parent string, child string) {
 	}
 	for _, nodeID := range node.Children {
 		if childID == nodeID {
-			// already exists
 			return
 		}
 	}
@@ -1074,11 +946,6 @@ func processItem(fstTmpl *fasttemplate.Template, name string, index int, item wf
 		replaceMap["item"] = fmt.Sprintf("%v", item)
 		newName = fmt.Sprintf("%s(%d:%v)", name, index, item)
 	case wfv1.Map:
-		// Handle the case when withItems is a list of maps.
-		// vals holds stringified versions of the map items which are incorporated as part of the step name.
-		// For example if the item is: {"name": "jesse","group":"developer"}
-		// the vals would be: ["name:jesse", "group:developer"]
-		// This would eventually be part of the step name (group:developer,name:jesse)
 		vals := make([]string, 0)
 		for itemKey, itemVal := range item.MapVal {
 			replaceMap[fmt.Sprintf("item.%s", itemKey)] = fmt.Sprintf("%v", itemVal)
@@ -1091,7 +958,6 @@ func processItem(fstTmpl *fasttemplate.Template, name string, index int, item wf
 		}
 		replaceMap["item"] = string(jsonByteVal)
 
-		// sort the values so that the name is deterministic
 		sort.Strings(vals)
 		newName = fmt.Sprintf("%s(%d:%v)", name, index, strings.Join(vals, ","))
 	case wfv1.List:

@@ -29,24 +29,22 @@ func waitContainer() error {
 	defer stats.LogStats()
 	stats.StartStatsTicker(5 * time.Minute)
 
-	// Wait for main container to complete and kill sidecars
 	err := wfExecutor.Wait()
 	if err != nil {
 		wfExecutor.AddError(err)
-		// do not return here so we can still try to save outputs
 	}
 	err = wfExecutor.SaveArtifacts()
 	if err != nil {
 		wfExecutor.AddError(err)
 		return err
 	}
-	// Saving output parameters
+
 	err = wfExecutor.SaveParameters()
 	if err != nil {
 		wfExecutor.AddError(err)
 		return err
 	}
-	// Capture output script result
+
 	err = wfExecutor.CaptureScriptResult()
 	if err != nil {
 		wfExecutor.AddError(err)

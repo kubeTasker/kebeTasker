@@ -44,12 +44,8 @@ type WorkflowExecutor struct {
 	PodAnnotationsPath string
 	ExecutionControl   *common.ExecutionControl
 
-	// memoized container ID to prevent multiple lookups
 	mainContainerID string
-	// memoized secrets
 	memoizedSecrets map[string]string
-	// list of errors that occurred during execution.
-	// the first of these is used as the overall message of the node
 	errors []error
 }
 
@@ -95,7 +91,6 @@ func (we *WorkflowExecutor) LoadArtifacts() error {
 		if err != nil {
 			return err
 		}
-		// Determine the file path of where to load the artifact
 		if art.Path == "" {
 			return errors.InternalErrorf("Artifact %s did not specify a path", art.Name)
 		}
@@ -104,18 +99,10 @@ func (we *WorkflowExecutor) LoadArtifacts() error {
 		if mnt == nil {
 			artPath = path.Join(common.ExecutorArtifactBaseDir, art.Name)
 		} else {
-			// If we get here, it means the input artifact path overlaps with an user specified
-			// volumeMount in the container. Because we also implement input artifacts as volume
-			// mounts, we need to load the artifact into the user specified volume mount,
-			// as opposed to the `input-artifacts` volume that is an implementation detail
-			// unbeknownst to the user.
 			log.Infof("Specified artifact path %s overlaps with volume mount at %s. Extracting to volume mount", art.Path, mnt.MountPath)
 			artPath = path.Join(common.InitContainerMainFilesystemDir, art.Path)
 		}
 
-		// The artifact is downloaded to a temporary location, after which we determine if
-		// the file is a tarball or not. If it is, it is first extracted then renamed to
-		// the desired location. If not, it is simply renamed to the location.
 		tempArtPath := artPath + ".tmp"
 		err = artDriver.Load(&art, tempArtPath)
 		if err != nil {
@@ -177,7 +164,6 @@ func (we *WorkflowExecutor) SaveArtifacts() error {
 		return err
 	}
 
-	// This directory temporarily stores the tarballs of the artifacts before uploading
 	tempOutArtDir := "/kubetasker/outputs/artifacts"
 	err = os.MkdirAll(tempOutArtDir, os.ModePerm)
 	if err != nil {
@@ -186,15 +172,12 @@ func (we *WorkflowExecutor) SaveArtifacts() error {
 
 	for i, art := range we.Template.Outputs.Artifacts {
 		log.Infof("Saving artifact: %s", art.Name)
-		// Determine the file path of where to find the artifact
 		if art.Path == "" {
 			return errors.InternalErrorf("Artifact %s did not specify a path", art.Name)
 		}
 
 		fileName := fmt.Sprintf("%s.tgz", art.Name)
 		if !art.HasLocation() {
-			// If user did not explicitly set an artifact destination location in the template,
-			// use the default archive location (appended with the filename).
 			if we.Template.ArchiveLocation == nil {
 				return errors.Errorf(errors.CodeBadRequest, "Unable to determine path to store %s. No archive location", art.Name)
 			}
@@ -224,8 +207,6 @@ func (we *WorkflowExecutor) SaveArtifacts() error {
 		if err != nil {
 			return err
 		}
-		// remove is best effort (the container will go away anyways).
-		// we just want reduce peak space usage
 		err = os.Remove(tempArtPath)
 		if err != nil {
 			log.Warnf("Failed to remove %s", tempArtPath)
@@ -250,15 +231,9 @@ func (we *WorkflowExecutor) SaveParameters() error {
 
 	for i, param := range we.Template.Outputs.Parameters {
 		log.Infof("Saving path output parameter: %s", param.Name)
-		// Determine the file path of where to find the parameter
 		if param.ValueFrom == nil || param.ValueFrom.Path == "" {
 			continue
 		}
-		// Use docker cp command to print out the content of the file
-		// Node docker cp CONTAINER:SRC_PATH DEST_PATH|- streams the contents of the resource
-		// as a tar archive to STDOUT if using - as DEST_PATH. Thus, we need to extract the
-		// content from the tar archive and output into stdout. In this way, we do not need to
-		// create and copy the content into a file from the wait container.
 		dockerCpCmd := fmt.Sprintf("docker cp -a %s:%s - | tar -ax -O", mainCtrID, param.ValueFrom.Path)
 		cmd := exec.Command("sh", "-c", dockerCpCmd)
 		log.Info(cmd.Args)
@@ -319,7 +294,6 @@ func (we *WorkflowExecutor) InitDriver(art wfv1.Artifact) (artifact.ArtifactDriv
 		return &gitDriver, nil
 	}
 	if art.Artifactory != nil {
-		// Getting Kubernetes namespace from the environment variables
 		namespace := os.Getenv(common.EnvVarNamespace)
 		username, err := we.getSecrets(namespace, art.Artifactory.UsernameSecret.Name, art.Artifactory.UsernameSecret.Key)
 		if err != nil {
@@ -387,8 +361,6 @@ func (we *WorkflowExecutor) getSecrets(namespace, name, key string) (string, err
 	if err != nil {
 		return "", errors.InternalWrapError(err)
 	}
-	// memoize all keys in the secret since it's highly likely we will need to get a
-	// subsequent key in the secret (e.g. username + password) and we can save an API call
 	for k, v := range secret.Data {
 		we.memoizedSecrets[fmt.Sprintf("%s/%s/%s", namespace, name, k)] = string(v)
 	}
@@ -492,7 +464,6 @@ func isTarball(filePath string) bool {
 // untar extracts a tarball to a temporary directory,
 // renaming it to the desired location
 func untar(tarPath string, destPath string) error {
-	// first extract the tar into a temporary dir
 	tmpDir := destPath + ".tmpdir"
 	err := os.MkdirAll(tmpDir, os.ModePerm)
 	if err != nil {
@@ -502,15 +473,11 @@ func untar(tarPath string, destPath string) error {
 	if err != nil {
 		return err
 	}
-	// next, decide how we wish to rename the file/dir
-	// to the destination path.
 	files, err := ioutil.ReadDir(tmpDir)
 	if err != nil {
 		return errors.InternalWrapError(err)
 	}
 	if len(files) == 1 {
-		// if the tar is comprised of single file or directory,
-		// rename that file to the desired location
 		filePath := path.Join(tmpDir, files[0].Name())
 		err = os.Rename(filePath, destPath)
 		if err != nil {
@@ -521,8 +488,6 @@ func untar(tarPath string, destPath string) error {
 			return errors.InternalWrapError(err)
 		}
 	} else {
-		// the tar extracted into multiple files. In this case,
-		// just rename the temp directory to the dest path
 		err = os.Rename(tmpDir, destPath)
 		if err != nil {
 			return errors.InternalWrapError(err)
@@ -537,15 +502,12 @@ func containerID(ctrID string) string {
 }
 
 // Wait is the sidecar container logic which waits for the main container to complete.
-// Also monitors for updates in the pod annotations which may change (e.g. terminate)
-// Upon completion, kills any sidecars after it finishes.
 func (we *WorkflowExecutor) Wait() (err error) {
 	defer func() {
 		killSidecarsErr := we.killSidecars()
 		if killSidecarsErr != nil {
 			log.Errorf("Failed to kill sidecars: %v", killSidecarsErr)
 			if err == nil {
-				// set error only if not already set
 				err = killSidecarsErr
 			}
 		}
@@ -581,13 +543,10 @@ func (we *WorkflowExecutor) waitMainContainerStart() (string, error) {
 				we.mainContainerID = containerID(ctrStatus.ContainerID)
 				return containerID(ctrStatus.ContainerID), nil
 			} else if ctrStatus.State.Waiting == nil && ctrStatus.State.Running == nil && ctrStatus.State.Terminated == nil {
-				// status still not ready, wait
 				time.Sleep(1 * time.Second)
 			} else if ctrStatus.State.Waiting != nil {
-				// main container is still in waiting status
 				time.Sleep(1 * time.Second)
 			} else {
-				// main container in running or terminated state but missing container ID
 				return "", errors.InternalError("Main container ID cannot be found")
 			}
 		}
@@ -595,10 +554,8 @@ func (we *WorkflowExecutor) waitMainContainerStart() (string, error) {
 }
 
 // monitorAnnotations starts a goroutine which monitors for any changes to the pod annotations.
-// Emits an event on the returned channel upon any updates
 func (we *WorkflowExecutor) monitorAnnotations(ctx context.Context) <-chan struct{} {
 	log.Infof("Starting annotations monitor")
-	// Create a fsnotify watcher on the local annotations file to listen for updates from the Downward API
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -608,13 +565,9 @@ func (we *WorkflowExecutor) monitorAnnotations(ctx context.Context) <-chan struc
 		log.Fatal(err)
 	}
 
-	// Create a channel to listen for a SIGUSR2. Upon receiving of the signal, we force reload our annotations
-	// directly from kubernetes API. The controller uses this to fast-track notification of annotations
-	// instead of waiting for the volume file to get updated (which can take minutes)
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGUSR2)
 
-	// Create a channel which will notify a listener on new updates to the annotations
 	annotationUpdateCh := make(chan struct{})
 
 	go func() {
@@ -676,18 +629,11 @@ func (we *WorkflowExecutor) monitorDeadline(ctx context.Context, annotationsUpda
 			return
 		case <-annotationsUpdate:
 		default:
-			// TODO(jessesuen): we do not effectively use the annotations update channel yet. Ideally, we
-			// should optimize this logic so that we use some type of mutable timer against the deadline
-			// value instead of polling.
 			if we.ExecutionControl != nil && we.ExecutionControl.Deadline != nil {
 				if time.Now().UTC().After(*we.ExecutionControl.Deadline) {
 					if !we.ExecutionControl.Deadline.IsZero() {
-						// Zero value of the deadline indicates an intentional cancel vs. a timeout. We treat
-						// timeouts as a failure and the pod should be annotated with that error
 						errMsg := fmt.Sprintf("step exceeded deadline %s", *we.ExecutionControl.Deadline)
 						log.Warnf(errMsg)
-						// TODO(jessesuen): we do not have workflow or step level timeouts (yet) so do not annotate yet
-						//_ = we.AddAnnotation(common.AnnotationKeyNodeMessage, errMsg)
 					} else {
 						log.Info("step has been cancelled")
 					}
@@ -705,8 +651,6 @@ func (we *WorkflowExecutor) monitorDeadline(ctx context.Context, annotationsUpda
 	}
 }
 
-// killGracePeriod is the time in seconds after sending SIGTERM before
-// forcefully killing the sidcar with SIGKILL (value matches k8s)
 const killGracePeriod = 30
 
 // killContainers kills a list of containerIDs first with a SIGTERM then with a SIGKILL after a grace period
@@ -804,43 +748,30 @@ func unmarshalAnnotationField(filePath string, key string, into interface{}) err
 	}()
 	reader := bufio.NewReader(file)
 
-	// Prefix of key property in the annotation file
 	prefix := fmt.Sprintf("%s=", key)
 
 	for {
-		// Read line-by-line
 		var buffer bytes.Buffer
 		var l []byte
 		var isPrefix bool
 		for {
 			l, isPrefix, err = reader.ReadLine()
 			buffer.Write(l)
-			// If we've reached the end of the line, stop reading.
 			if !isPrefix {
 				break
 			}
-			// If we're just at the EOF, break
 			if err != nil {
 				break
 			}
 		}
-		// The end of the annotation file
 		if err == io.EOF {
 			break
 		}
 		line := buffer.String()
 
-		// Read property
 		if strings.HasPrefix(line, prefix) {
-			// Trim the prefix
 			content := strings.TrimPrefix(line, prefix)
 
-			// This part is a bit tricky in terms of unmarshalling
-			// The content in the file will be something like,
-			// `"{\"type\":\"container\",\"inputs\":{},\"outputs\":{}}"`
-			// which is required to unmarshal twice
-
-			// First unmarshal to a string without escaping characters
 			var fieldString string
 			err = json.Unmarshal([]byte(content), &fieldString)
 			if err != nil {
@@ -848,7 +779,6 @@ func unmarshalAnnotationField(filePath string, key string, into interface{}) err
 				return errors.InternalWrapError(err)
 			}
 
-			// Second unmarshal to a template
 			err = json.Unmarshal([]byte(fieldString), into)
 			if err != nil {
 				log.Errorf("Error unmarshalling annotation into datastructure, %s, %v\n", fieldString, err)
@@ -862,6 +792,5 @@ func unmarshalAnnotationField(filePath string, key string, into interface{}) err
 		return errors.InternalWrapError(err)
 	}
 
-	// If we reach here, then the key does not exist in the file
 	return errors.Errorf(errors.CodeNotFound, "Key %s not found in annotation file: %s", key, filePath)
 }

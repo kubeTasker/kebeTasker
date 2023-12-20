@@ -19,13 +19,8 @@ type GitArtifactDriver struct {
 }
 
 // Load download artifacts from an git URL
-// Credentials are temporarily stored in a git-credentials file during the clone
-// and deleted before returning. This is to prevent credentials from inadvertently
-// leaking such as in the repo_dir/.git/config or logging an insecure url.
 func (g *GitArtifactDriver) Load(inputArtifact *wfv1.Artifact, path string) error {
 	if g.Username != "" || g.Password != "" {
-		// Formulate an insecure repo URL which incorporates the credentials which
-		// we temporarily store it to a git-credentials file during the clone.
 		insecureURL, err := url.Parse(inputArtifact.Git.Repo)
 		if err != nil {
 			return errors.InternalWrapError(err)

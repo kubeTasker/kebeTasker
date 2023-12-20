@@ -70,7 +70,6 @@ func initKubeClient() *kubernetes.Clientset {
 		log.Fatal(err)
 	}
 
-	// create the clientset
 	clientset, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -99,13 +98,6 @@ func InitWorkflowClient(ns ...string) v1alpha1.WorkflowInterface {
 	return wfClient
 }
 
-// ansiFormat wraps ANSI escape codes to a string to format the string to a desired color.
-// NOTE: we still apply formatting even if there is no color formatting desired.
-// The purpose of doing this is because when we apply ANSI color escape sequences to our
-// output, this confuses the tabwriter library which miscalculates widths of columns and
-// misaligns columns. By always applying a ANSI escape sequence (even when we don't want
-// color, it provides more consistent string lengths so that tabwriter can calculate
-// widths correctly.
 func ansiFormat(s string, codes ...int) string {
 	if globalArgs.noColor || os.Getenv("TERM") == "dumb" || len(codes) == 0 {
 		return s
@@ -131,8 +123,6 @@ func splitYAMLFile(body []byte) ([]wfv1.Workflow, error) {
 		var wf wfv1.Workflow
 		err := yaml.Unmarshal([]byte(manifestStr), &wf)
 		if wf.Kind != "" && wf.Kind != workflow.Kind {
-			// If we get here, it was a k8s manifest which was not of type 'Workflow'
-			// We ignore these since we only care about validating Workflow manifests.
 			continue
 		}
 		if err != nil {

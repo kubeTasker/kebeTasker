@@ -8,7 +8,6 @@ const (
 	KubeTaskerControllerClusterRole        = "tasker-cluster-role"
 	KubeTaskerControllerClusterRoleBinding = "tasker-binding"
 
-	// kubetasker UI resource constants
 	KubeUIServiceAccount     = "kube-ui"
 	KubeUIClusterRole        = "kube-ui-cluster-role"
 	KubeUIClusterRoleBinding = "kube-ui-binding"
@@ -20,7 +19,6 @@ var (
 	KubeTaskerControllerPolicyRules = []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{""},
-			// TODO(jesse): remove exec privileges when issue #499 is resolved
 			Resources: []string{"pods", "pods/exec"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch"},
 		},

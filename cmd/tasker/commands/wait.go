@@ -33,13 +33,9 @@ var waitCmd = &cobra.Command{
 	Run:   WaitWorkflowsRun,
 }
 
-// VersionChecker checks the Kubernetes version and currently logs a message if wait should
-// be implemented using watch instead of polling.
 type VersionChecker struct{}
 
 func (vc *VersionChecker) run() {
-	// Watch APIs on CRDs using fieldSelectors are only supported in Kubernetes v1.9.0 onwards.
-	// https://github.com/kubernetes/kubernetes/issues/51046.
 	versionInfo, err := clientset.ServerVersion()
 	if err != nil {
 		log.Fatalf("Failed to get Kubernetes version: %v", err)
@@ -60,8 +56,6 @@ func (vc *VersionChecker) run() {
 	}
 }
 
-// WorkflowStatusPoller exports methods to wait on workflows by periodically
-// querying their status.
 type WorkflowStatusPoller struct {
 	wfc            v1alpha1.WorkflowInterface
 	ignoreNotFound bool
@@ -110,9 +104,6 @@ func (wsp *WorkflowStatusPoller) waitUpdateWaitGroup(workflowName string, wg *sy
 
 // WaitWorkflows waits for the given workflowNames.
 func (wsp *WorkflowStatusPoller) WaitWorkflows(workflowNames []string) {
-	// TODO(shri): When Kubernetes 1.9 support is added, this block should be executed
-	// only for versions 1.8 and for 1.9, a new "watch" based implmentation should be
-	// used.
 	var vc VersionChecker
 	vc.run()
 

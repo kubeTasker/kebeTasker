@@ -70,7 +70,6 @@ func (i *Item) String() string {
 		panic(err)
 	}
 	if i.Type == String {
-		// chop off the double quotes
 		return string(jsonBytes[1 : len(jsonBytes)-1])
 	}
 	return string(jsonBytes)
@@ -149,7 +148,6 @@ func (iv *ItemValue) String() string {
 		panic(err)
 	}
 	if iv.Type == String {
-		// chop off the double quotes
 		return string(jsonBytes[1 : len(jsonBytes)-1])
 	}
 	return string(jsonBytes)

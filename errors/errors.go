@@ -18,8 +18,6 @@ const (
 	CodeInternal       = "ERR_INTERNAL"
 )
 
-// kubeTaskerError is an error interface that additionally adds support for
-// stack trace, error code, and a JSON representation of the error
 type kubeTaskerError interface {
 	Error() string
 	Code() string
@@ -27,7 +25,6 @@ type kubeTaskerError interface {
 	JSON() []byte
 }
 
-// kubetaskererr is the internal implementation of an kubeTasker error which wraps the error from pkg/errors
 type kubetaskererr struct {
 	code    string
 	message string
@@ -35,7 +32,6 @@ type kubetaskererr struct {
 }
 
 // New returns an error with the supplied message.
-// New also records the stack trace at the point it was called.
 func New(code string, message string) error {
 	err := errors.New(message)
 	return kubetaskererr{code, message, err}
@@ -80,17 +76,7 @@ func Wrap(err error, code string, message string) error {
 	return kubetaskererr{code, message, err}
 }
 
-// Cause returns the underlying cause of the error, if possible.
-// An error value has a cause if it implements the following
-// interface:
-//
-//	type causer interface {
-//	       Cause() error
-//	}
-//
-// If the error does not implement Cause, the original error will
-// be returned. If the error is nil, nil will be returned without further
-// investigation.
+// Cause returns the underlying cause of the error.
 func Cause(err error) error {
 	if kubeTaskerErr, ok := err.(kubetaskererr); ok {
 		return unwrapCausekubeTaskerErr(kubeTaskerErr.err)

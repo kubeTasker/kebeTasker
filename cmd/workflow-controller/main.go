@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	// CLIName is the name of the CLI
 	CLIName = "workflow-controller"
 )
 
@@ -82,7 +81,6 @@ func Run(cmd *cobra.Command, args []string) {
 	kubeclientset := kubernetes.NewForConfigOrDie(config)
 	wflientset := wfclientset.NewForConfigOrDie(config)
 
-	// start a controller on instances of our custom resource
 	wfController := controller.NewWorkflowController(config, kubeclientset, wflientset, rootArgs.configMap)
 	err = wfController.ResyncConfig()
 	if err != nil {

@@ -148,8 +148,6 @@ func countCompletedRunning(wf *wfv1.Workflow) (int, int) {
 	running := 0
 	for _, node := range wf.Status.Nodes {
 		if len(node.Children) > 0 {
-			// not a pod
-			// TODO: this will change after DAG implementation
 			continue
 		}
 		if node.Completed() {
@@ -184,7 +182,6 @@ func parameterString(params []wfv1.Parameter) string {
 	return strings.Join(pStrs, ",")
 }
 
-// ByFinishedAt is a sort interface which sorts running jobs earlier before considering FinishedAt
 type ByFinishedAt []wfv1.Workflow
 
 func (f ByFinishedAt) Len() int      { return len(f) }

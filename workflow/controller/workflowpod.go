@@ -20,9 +20,6 @@ import (
 
 // Reusable k8s pod spec portions used in workflow pods
 var (
-	// volumePodMetadata makes available the pod metadata available as a file
-	// to the executor's init and sidecar containers. Specifically, the template
-	// of the pod is stored as an annotation
 	volumePodMetadata = apiv1.Volume{
 		Name: common.PodMetadataVolumeName,
 		VolumeSource: apiv1.VolumeSource{
@@ -47,9 +44,6 @@ var (
 	hostPathDir    = apiv1.HostPathDirectory
 	hostPathSocket = apiv1.HostPathSocket
 
-	// volumeDockerLib provides the wait container access to the minion's host docker containers
-	// runtime files (e.g. /var/lib/docker/container). This is used by the executor to access
-	// the main container's logs (and potentially storage to upload output artifacts)
 	volumeDockerLib = apiv1.Volume{
 		Name: common.DockerLibVolumeName,
 		VolumeSource: apiv1.VolumeSource{
@@ -65,10 +59,6 @@ var (
 		ReadOnly:  true,
 	}
 
-	// volumeDockerSock provides the wait container direct access to the minion's host docker daemon.
-	// The primary purpose of this is to make available `docker cp` to collect an output artifact
-	// from a container. Alternatively, we could use `kubectl cp`, but `docker cp` avoids the extra
-	// hop to the kube api server.
 	volumeDockerSock = apiv1.Volume{
 		Name: common.DockerSockVolumeName,
 		VolumeSource: apiv1.VolumeSource{
@@ -144,9 +134,6 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 	}
 
 	if tmpl.GetType() != wfv1.TemplateTypeResource {
-		// we do not need the wait container for resource templates because
-		// taskerexec runs as the main container and will perform the job of
-		// annotating the outputs or errors, making the wait container redundant.
 		waitCtr, err := woc.newWaitContainer(tmpl)
 		if err != nil {
 			return nil, err
@@ -154,8 +141,6 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 		pod.Spec.Containers = append(pod.Spec.Containers, *waitCtr)
 	}
 
-	// Add init container only if it needs input artifacts. This is also true for
-	// script templates (which needs to populate the script)
 	if len(tmpl.Inputs.Artifacts) > 0 || tmpl.GetType() == wfv1.TemplateTypeScript {
 		initCtr := woc.newInitContainer(tmpl)
 		pod.Spec.InitContainers = []apiv1.Container{initCtr}
@@ -189,10 +174,6 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 		return nil, err
 	}
 
-	// Set the container template JSON in pod annotations, which executor
-	// will examine for things like artifact location/path. Also ensures
-	// that all variables have been resolved. Do this last, after all
-	// template manipulations have been performed.
 	tmplBytes, err := json.Marshal(tmpl)
 	if err != nil {
 		return nil, err
@@ -206,8 +187,6 @@ func (woc *wfOperationCtx) createWorkflowPod(nodeName string, mainCtr apiv1.Cont
 	created, err := woc.controller.kubeclientset.CoreV1().Pods(woc.wf.ObjectMeta.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 	if err != nil {
 		if apierr.IsAlreadyExists(err) {
-			// workflow pod names are deterministic. We can get here if the
-			// controller fails to persist the workflow after creating the pod.
 			woc.log.Infof("Skipped pod %s (%s) creation: already exists", nodeName, nodeID)
 			return created, nil
 		}
@@ -257,13 +236,11 @@ func (woc *wfOperationCtx) newExecContainer(name string, privileged bool) *apiv1
 
 // addSchedulingConstraints applies any node selectors or affinity rules to the pod, either set in the workflow or the template
 func (woc *wfOperationCtx) addSchedulingConstraints(pod *apiv1.Pod, tmpl *wfv1.Template) {
-	// Set nodeSelector (if specified)
 	if len(tmpl.NodeSelector) > 0 {
 		pod.Spec.NodeSelector = tmpl.NodeSelector
 	} else if len(woc.wf.Spec.NodeSelector) > 0 {
 		pod.Spec.NodeSelector = woc.wf.Spec.NodeSelector
 	}
-	// Set affinity (if specified)
 	if tmpl.Affinity != nil {
 		pod.Spec.Affinity = tmpl.Affinity
 	} else if woc.wf.Spec.Affinity != nil {
@@ -272,7 +249,6 @@ func (woc *wfOperationCtx) addSchedulingConstraints(pod *apiv1.Pod, tmpl *wfv1.T
 }
 
 // addVolumeReferences adds any volumeMounts that a container/sidecar is referencing, to the pod.spec.volumes
-// These are either specified in the workflow.spec.volumes or the workflow.spec.volumeClaimTemplate section
 func (woc *wfOperationCtx) addVolumeReferences(pod *apiv1.Pod, tmpl *wfv1.Template) error {
 	if tmpl.Container == nil && len(tmpl.Sidecars) == 0 {
 		return nil
@@ -330,20 +306,6 @@ func getVolByName(name string, wf *wfv1.Workflow) *apiv1.Volume {
 }
 
 // addInputArtifactVolumes sets up the artifacts volume to the pod to support input artifacts to containers.
-// In order support input artifacts, the init container shares a emptydir volume with the main container.
-// It is the responsibility of the init container to load all artifacts to the mounted emptydir location.
-// (e.g. /inputs/artifacts/CODE). The shared emptydir is mapped to the user's desired location in the main
-// container.
-//
-// It is possible that a user specifies overlapping paths of an artifact path with a volume mount,
-// (e.g. user wants an external volume mounted at /src, while simultaneously wanting an input artifact
-// placed at /src/some/subdirectory). When this occurs, we need to prevent the duplicate bind mounting of
-// overlapping volumes, since the outer volume will not see the changes made in the artifact emptydir.
-//
-// To prevent overlapping bind mounts, both the controller and executor will recognize the overlap between
-// the explicit volume mount and the artifact emptydir and prevent all uses of the emptydir for purposes of
-// loading data. The controller will omit mounting the emptydir to the artifact path, and the executor
-// will load the artifact in the in user's volume (as opposed to the emptydir)
 func (woc *wfOperationCtx) addInputArtifactsVolumes(pod *apiv1.Pod, tmpl *wfv1.Template) error {
 	if len(tmpl.Inputs.Artifacts) == 0 {
 		return nil
@@ -364,9 +326,6 @@ func (woc *wfOperationCtx) addInputArtifactsVolumes(pod *apiv1.Pod, tmpl *wfv1.T
 			}
 			initCtr.VolumeMounts = append(initCtr.VolumeMounts, volMount)
 
-			// We also add the user supplied mount paths to the init container,
-			// in case the executor needs to load artifacts to this volume
-			// instead of the artifacts volume
 			if tmpl.Container != nil {
 				for _, mnt := range tmpl.Container.VolumeMounts {
 					mnt.MountPath = path.Join(common.InitContainerMainFilesystemDir, mnt.MountPath)
@@ -389,17 +348,12 @@ func (woc *wfOperationCtx) addInputArtifactsVolumes(pod *apiv1.Pod, tmpl *wfv1.T
 	if mainCtr == nil {
 		panic("Could not find main container in pod spec")
 	}
-	// TODO: the order in which we construct the volume mounts may matter,
-	// especially if they are overlapping.
 	for _, art := range tmpl.Inputs.Artifacts {
 		if art.Path == "" {
 			return errors.Errorf(errors.CodeBadRequest, "inputs.artifacts.%s did not specify a path", art.Name)
 		}
 		overlap := common.FindOverlappingVolume(tmpl, art.Path)
 		if overlap != nil {
-			// artifact path overlaps with a mounted volume. do not mount the
-			// artifacts emptydir to the main container. init would have copied
-			// the artifact to the user's volume instead
 			woc.log.Debugf("skip volume mount of %s (%s): overlaps with mount %s at %s",
 				art.Name, art.Path, overlap.Name, overlap.MountPath)
 			continue
@@ -419,17 +373,11 @@ func (woc *wfOperationCtx) addInputArtifactsVolumes(pod *apiv1.Pod, tmpl *wfv1.T
 }
 
 // addArchiveLocation updates the template with artifact repository information configured in the controller.
-// This is skipped for templates which have explicitly set an archive location in the template
 func (woc *wfOperationCtx) addArchiveLocation(pod *apiv1.Pod, tmpl *wfv1.Template) error {
 	if tmpl.ArchiveLocation != nil {
 		return nil
 	}
 	tmpl.ArchiveLocation = &wfv1.ArtifactLocation{}
-	// artifacts are stored in using the following formula:
-	// <repo_key_prefix>/<worflow_name>/<node_id>/<artifact_name>.tgz
-	// (e.g. myworkflowartifacts/kubetakser-wf-fhljp/kubetasker-wf-fhljp-123291312382/src.tgz)
-	// TODO: will need to support more advanced organization of artifacts such as dated
-	// (e.g. myworkflowartifacts/2023/11/21/... )
 	if woc.controller.Config.ArtifactRepository.S3 != nil {
 		log.Debugf("Setting s3 artifact repository information")
 		keyPrefix := ""
@@ -464,7 +412,7 @@ func (woc *wfOperationCtx) addArchiveLocation(pod *apiv1.Pod, tmpl *wfv1.Templat
 }
 
 // addExecutorStagingVolume sets up a shared staging volume between the init container
-// and main container for the purpose of holding the script source code for script templates
+// and main container
 func addExecutorStagingVolume(pod *apiv1.Pod) {
 	volName := "kubetasker-staging"
 	stagingVol := apiv1.Volume{
@@ -509,7 +457,6 @@ func addExecutorStagingVolume(pod *apiv1.Pod) {
 }
 
 // addSidecars adds all sidecars to the pod spec of the step.
-// Optionally volume mounts from the main container to the sidecar
 func addSidecars(pod *apiv1.Pod, tmpl *wfv1.Template) error {
 	if len(tmpl.Sidecars) == 0 {
 		return nil

@@ -111,7 +111,6 @@ func printWorkflowHelper(wf *wfv1.Workflow) {
 	if wf.Status.Nodes != nil {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Println()
-		// apply a dummy FgDefault format to align tabwriter with the rest of the columns
 		if getArgs.output == "wide" {
 			fmt.Fprintf(w, "%s\tPODNAME\tDURATION\tARTIFACTS\tMESSAGE\n", ansiFormat("STEP", FgDefault))
 		} else {
@@ -131,6 +130,7 @@ func printWorkflowHelper(wf *wfv1.Workflow) {
 	}
 }
 
+// print the node tree gragh
 func printNodeTree(w *tabwriter.Writer, wf *wfv1.Workflow, node wfv1.NodeStatus, depth int, nodePrefix string, childPrefix string) {
 	nodeName := fmt.Sprintf("%s %s", jobStatusIconMap[node.Phase], node.Name)
 	var args []interface{}
@@ -167,10 +167,6 @@ func printNodeTree(w *tabwriter.Writer, wf *wfv1.Workflow, node wfv1.NodeStatus,
 			printNodeTree(w, wf, childNode, depth+1, childNodePrefix, childChldPrefix)
 		}
 	} else {
-		// If the node has children, the node is a workflow template and
-		// node.Children prepresent a list of parallel steps. We skip
-		// a generation when recursing since the children nodes of workflow
-		// templates represent a virtual step group, which are not worh printing.
 		for i, stepGroupNodeID := range node.Children {
 			lastStepGroup := bool(i == len(node.Children)-1)
 			var part1, subp1 string
@@ -215,7 +211,6 @@ func printNodeTree(w *tabwriter.Writer, wf *wfv1.Workflow, node wfv1.NodeStatus,
 				}
 				childNodePrefix := childPrefix + part1 + part2
 				childChldPrefix := childPrefix + subp1 + subp2
-				// Remove stepgroup name from being displayed
 				childNode.Name = strings.TrimPrefix(childNode.Name, stepGroupNode.Name+".")
 				printNodeTree(w, wf, childNode, depth+1, childNodePrefix, childChldPrefix)
 			}

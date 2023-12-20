@@ -40,9 +40,6 @@ func (we *WorkflowExecutor) ExecResource(action string, manifestPath string) (st
 	return resourceName, nil
 }
 
-// gjsonLabels is an implementation of labels.Labels interface
-// which allows us to take advantage of k8s labels library
-// for the purposes of evaluating fail and success conditions
 type gjsonLabels struct {
 	json []byte
 }
@@ -82,9 +79,6 @@ func (we *WorkflowExecutor) WaitResource(resourceName string) error {
 		failReqs, _ = failSelector.Requirements()
 	}
 
-	// Start the condition result reader using ExponentialBackoff
-	// Exponential backoff is for steps of 0, 5, 20, 80, 320 seconds since the first step is without
-	// delay in the ExponentialBackoff
 	err := wait.ExponentialBackoff(wait.Backoff{Duration: (time.Second * 5), Factor: 4.0, Steps: 5},
 		func() (bool, error) {
 			isErrRetry, err := checkResourceState(resourceName, successReqs, failReqs)
@@ -131,14 +125,6 @@ func checkResourceState(resourceName string, successReqs labels.Requirements, fa
 		if err != nil {
 			resultErr := err
 			log.Warnf("Json reader returned error %v. Calling kill (usually superfluous)", err)
-			// We don't want to write OS specific code so we don't want to call syscall package code. But that means
-			// there is no way to figure out if a process is running or not in an asynchronous manner. exec.Wait will
-			// always block and we need to call that to get the exit code of the process. So we will unconditionally
-			// call exec.Process.Kill and then assume that wait will not block after that. Two things may happen:
-			// 1. Process already exited and kill does nothing (returns error which we ignore) and then we call
-			//    Wait and get the proper return value
-			// 2. Process is running gets, killed with exec.Process.Kill call and Wait returns an error code and we give up
-			//    and don't retry
 			_ = cmd.Process.Kill()
 
 			log.Warnf("Command for kubectl get -w for %s exited. Getting return value using Wait", resourceName)
@@ -160,7 +146,6 @@ func checkResourceState(resourceName string, successReqs labels.Requirements, fa
 			msg := fmt.Sprintf("failure condition '%s' evaluated %v", req, failed)
 			log.Infof(msg)
 			if failed {
-				// TODO: need a better error code instead of BadRequest
 				return false, errors.Errorf(errors.CodeBadRequest, msg)
 			}
 		}

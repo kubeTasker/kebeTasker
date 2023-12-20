@@ -16,12 +16,10 @@ import (
 )
 
 const (
-	// CLIName is the name of the CLI
 	CLIName = "taskerexec"
 )
 
 var (
-	// GlobalArgs hold global CLI flags
 	GlobalArgs globalFlags
 )
 
@@ -56,7 +54,6 @@ func getClientConfig(kubeconfig string) (*rest.Config, error) {
 func initExecutor() *executor.WorkflowExecutor {
 	podAnnotationsPath := common.PodMetadataAnnotationsPath
 
-	// Use the path specified from the flag
 	if GlobalArgs.podAnnotationsPath != "" {
 		podAnnotationsPath = GlobalArgs.podAnnotationsPath
 	}

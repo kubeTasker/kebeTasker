@@ -29,12 +29,9 @@ import (
 )
 
 var (
-	// These values may be overridden by the link flags during build
-	// (e.g. imageTag will use the official release tag on tagged builds)
 	imageNamespace = "songjunfan"
 	imageTag       = "latest"
 
-	// These are the default image names which `tasker install` uses during install
 	DefaultControllerImage = imageNamespace + "/workflow-controller:" + imageTag
 	DefaultExecutorImage   = imageNamespace + "/taskerexec:" + imageTag
 	DefaultUiImage         = imageNamespace + "/taskerui:" + imageTag
@@ -481,8 +478,7 @@ func createDeploymentHelper(deployment *appsv1.Deployment, args InstallFlags) {
 
 // upgradeNeeded checks two deployments and returns whether or not there are obvious
 // differences in a few deployment/container spec fields that would warrant an
-// upgrade. WARNING: This is not intended to be comprehensive -- its primary purpose
-// is to check if the controller/UI image is out of date with this version of kubeTasker.
+// upgrade.
 func upgradeNeeded(dep1, dep2 *appsv1.Deployment) bool {
 	if len(dep1.Spec.Template.Spec.Containers) != len(dep2.Spec.Template.Spec.Containers) {
 		return true
@@ -613,7 +609,6 @@ func installCRD(clientset *kubernetes.Clientset, args InstallFlags) {
 		}
 		fmt.Printf("CustomResourceDefinition '%s' already exists\n", workflow.FullName)
 	}
-	// wait for CRD being established
 	var crd *apiextensionsv1.CustomResourceDefinition
 	err = wait.Poll(500*time.Millisecond, 60*time.Second, func() (bool, error) {
 		crd, err = apiextensionsclientset.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), workflow.FullName, metav1.GetOptions{})
