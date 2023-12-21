@@ -50,7 +50,7 @@ var listCmd = &cobra.Command{
 	Run:   listWorkflows,
 }
 
-var sinceRegex = regexp.MustCompile("^(\\d+)([smhd])$")
+var sinceRegex = regexp.MustCompile(`^(\d+)([smhd])$`)
 
 var timeMagnitudes = []humanize.RelTimeMagnitude{
 	{D: time.Second, Format: "0s", DivBy: time.Second},

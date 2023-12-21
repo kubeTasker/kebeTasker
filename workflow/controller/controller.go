@@ -296,7 +296,7 @@ func (wfc *WorkflowController) newWorkflowInformer() cache.SharedIndexInformer {
 		wfc.tweakWorkflowlist,
 	)
 	informer := wfInformerFactory.Kubetasker().V1alpha1().Workflows().Informer()
-	informer.AddEventHandler(
+	_, err := informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -318,6 +318,9 @@ func (wfc *WorkflowController) newWorkflowInformer() cache.SharedIndexInformer {
 			},
 		},
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return informer
 }
 
@@ -415,7 +418,7 @@ func (wfc *WorkflowController) newWorkflowPodWatch() *cache.ListWatch {
 func (wfc *WorkflowController) newPodInformer() cache.SharedIndexInformer {
 	source := wfc.newWorkflowPodWatch()
 	informer := cache.NewSharedIndexInformer(source, &apiv1.Pod{}, podResyncPeriod, cache.Indexers{})
-	informer.AddEventHandler(
+	_, err := informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -437,5 +440,8 @@ func (wfc *WorkflowController) newPodInformer() cache.SharedIndexInformer {
 			},
 		},
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return informer
 }

@@ -107,7 +107,7 @@ func ansiFormat(s string, codes ...int) string {
 	return fmt.Sprintf("%s[%sm%s%s[%dm", escape, sequence, s, escape, noFormat)
 }
 
-var yamlSeparator = regexp.MustCompile("\\n---")
+var yamlSeparator = regexp.MustCompile(`\n---`)
 
 // splitYAMLFile is a helper to split a body into multiple workflow objects
 func splitYAMLFile(body []byte) ([]wfv1.Workflow, error) {
