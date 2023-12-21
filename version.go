@@ -5,8 +5,6 @@ import (
 	"runtime"
 )
 
-// Version information set by link flags during build. We fall back to these sane
-// default values when we build outside the Makefile context (e.g. go build or go test).
 var (
 	version      = "0.0.0"                // value from VERSION file
 	buildDate    = "1970-01-01T00:00:00Z" // output from `date -u +'%Y-%m-%dT%H:%M:%SZ'`
@@ -35,12 +33,8 @@ func (v Version) String() string {
 func GetVersion() Version {
 	var versionStr string
 	if gitCommit != "" && gitTag != "" && gitTreeState == "clean" {
-		// if we have a clean tree state and the current commit is tagged,
-		// this is an official release.
 		versionStr = gitTag
 	} else {
-		// otherwise formulate a version string based on as much metadata
-		// information we have available.
 		versionStr = "v" + version
 		if len(gitCommit) >= 7 {
 			versionStr += "+" + gitCommit[0:7]

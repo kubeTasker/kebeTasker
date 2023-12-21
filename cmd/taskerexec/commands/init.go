@@ -21,6 +21,7 @@ var initCmd = &cobra.Command{
 	},
 }
 
+// load artifacts
 func loadArtifacts() error {
 	wfExecutor := initExecutor()
 	defer wfExecutor.HandleError()

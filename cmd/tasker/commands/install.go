@@ -120,7 +120,6 @@ func install(cmd *cobra.Command, args []string) {
 }
 
 func clusterAdminExists(clientset *kubernetes.Clientset) bool {
-	// TODO: change this method to check if RBAC is enabled
 	clusterRoles := clientset.RbacV1().ClusterRoles()
 	_, err := clusterRoles.Get(context.TODO(), "cluster-admin", metav1.GetOptions{})
 	if err != nil {

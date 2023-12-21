@@ -20,7 +20,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Global variables
 var (
 	restConfig       *rest.Config
 	clientConfig     clientcmd.ClientConfig
@@ -33,7 +32,6 @@ func init() {
 	cobra.OnInitialize(initializeSession)
 }
 
-// ANSI escape codes
 const (
 	escape    = "\x1b"
 	noFormat  = 0
@@ -51,7 +49,6 @@ const (
 
 func initializeSession() {
 	jobStatusIconMap = map[wfv1.NodePhase]string{
-		//Pending:   ansiFormat("◷", FgDefault),
 		wfv1.NodeRunning:   ansiFormat("●", FgCyan),
 		wfv1.NodeSucceeded: ansiFormat("✔", FgGreen),
 		wfv1.NodeSkipped:   ansiFormat("○", FgDefault),

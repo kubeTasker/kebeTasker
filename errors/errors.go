@@ -18,13 +18,6 @@ const (
 	CodeInternal       = "ERR_INTERNAL"
 )
 
-// type kubeTaskerError interface {
-// 	Error() string
-// 	Code() string
-// 	HTTPCode() int
-// 	JSON() []byte
-// }
-
 type kubetaskererr struct {
 	code    string
 	message string
@@ -65,9 +58,7 @@ func InternalWrapErrorf(err error, format string, args ...interface{}) error {
 	return Wrap(err, CodeInternal, fmt.Sprintf(format, args...))
 }
 
-// Wrap returns an error annotating err with a stack trace at the point Wrap is called,
-// and a new supplied message. The previous original is preserved and accessible via Cause().
-// If err is nil, Wrap returns nil.
+// Wrap returns an error annotating err with a stack trace
 func Wrap(err error, code string, message string) error {
 	if err == nil {
 		return nil
