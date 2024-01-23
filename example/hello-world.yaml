@@ -1,0 +1,17 @@
+apiVersion: kubetasker.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: hello-world-
+  labels:
+    workflows.kubetasker.io/archive-strategy: "false"
+  annotations:
+    workflows.kubetasker.io/description: |
+      This is a simple hello world example.
+spec:
+  entrypoint: whalesay
+  templates:
+  - name: whalesay
+    container:
+      image: docker/whalesay:latest
+      command: [cowsay]
+      args: ["hello world"]
